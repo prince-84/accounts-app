@@ -19,11 +19,6 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -147,26 +142,6 @@ export default function Sidebar({
                   pathname.startsWith(`${item.href}/`);
 
                 const Icon = item.icon;
-
-                const link = (
-                  <Link
-                    href={item.href}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-                      isActive
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                    }`}
-                  >
-                    <Icon
-                      size={20}
-                      className={
-                        isActive ? "text-blue-600" : "text-slate-400"
-                      }
-                    />
-
-                    {!collapsed && <span>{item.name}</span>}
-                  </Link>
-                );
 
                 return (
                     <div key={item.name}>
