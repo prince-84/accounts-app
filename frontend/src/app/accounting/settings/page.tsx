@@ -55,7 +55,7 @@ const DEFAULT_CURRENCIES: CurrencyOption[] = [
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { companies, activeCompany, setActiveCompanyById, deleteCompany } = useCompany();
+  const { companies, activeCompany, setActiveCompanyById, deleteCompany, refreshCompanies } = useCompany();
 
   const [currencies, setCurrencies] = useState<CurrencyOption[]>(DEFAULT_CURRENCIES);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);

@@ -5,7 +5,7 @@ interface KpiCardProps {
   title: string;
   value: string;
   badgeText?: string;
-  badgeType?: "success" | "info" | "danger" | "warning";
+  badgeType?: "success" | "info" | "danger" | "warning" | "neutral";
   subtext?: string;
   icon: LucideIcon;
   iconClassName?: string;
@@ -34,6 +34,8 @@ export default function KpiCard({
         return "bg-[#EFF6FF] text-[#2563EB]";
       case "warning":
         return "bg-[#FFFBEB] text-[#F59E0B]";
+      case "neutral":
+        return "bg-[#F1F5F9] text-[#64748B]";
       default:
         return "bg-[#ECFDF5] text-[#10B981]";
     }
