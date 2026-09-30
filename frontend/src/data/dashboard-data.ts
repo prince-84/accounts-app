@@ -53,28 +53,28 @@ export const recentInvoices = [
   {
     id: "INV-2026-001",
     customer: "The 5th Dimension Consultancy",
-    date: "Sep 1, 2026",
+    date: "01-09-2026",
     amount: "PKR 185,000",
     status: "Paid",
   },
   {
     id: "INV-2026-002",
     customer: "Ascension",
-    date: "Aug 29, 2026",
+    date: "29-08-2026",
     amount: "PKR 245,000",
     status: "Pending",
   },
   {
     id: "INV-2026-003",
     customer: "Brysona Consulting (PVT) Ltd",
-    date: "Aug 25, 2026",
+    date: "25-08-2026",
     amount: "PKR 320,000",
     status: "Overdue",
   },
   {
     id: "INV-2026-004",
     customer: "Vertex Solutions",
-    date: "Aug 20, 2026",
+    date: "20-08-2026",
     amount: "PKR 150,000",
     status: "Paid",
   },
@@ -142,7 +142,7 @@ export const upcomingPayments = [
   {
     id: "PAY-001",
     name: "Office Rent",
-    dueDate: "Sep 6, 2026",
+    dueDate: "06-09-2026",
     amount: "PKR 95,000",
     status: "Due Soon",
     type: "expense",
@@ -150,7 +150,7 @@ export const upcomingPayments = [
   {
     id: "PAY-002",
     name: "Software Subscription",
-    dueDate: "Sep 8, 2026",
+    dueDate: "08-09-2026",
     amount: "PKR 18,500",
     status: "Upcoming",
     type: "expense",
@@ -158,7 +158,7 @@ export const upcomingPayments = [
   {
     id: "PAY-003",
     name: "Invoice from Tech Solutions",
-    dueDate: "Sep 10, 2026",
+    dueDate: "10-09-2026",
     amount: "PKR 75,000",
     status: "Upcoming",
     type: "expense",
@@ -166,7 +166,7 @@ export const upcomingPayments = [
   {
     id: "PAY-004",
     name: "Internet & Utilities",
-    dueDate: "Sep 12, 2026",
+    dueDate: "12-09-2026",
     amount: "PKR 22,000",
     status: "Upcoming",
     type: "expense",

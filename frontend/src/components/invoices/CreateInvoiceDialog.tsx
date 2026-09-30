@@ -160,18 +160,18 @@ export default function CreateInvoiceDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 font-semibold text-white transition hover:bg-blue-700">
-        <Plus size={18} />
+      <DialogTrigger className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0F172A] px-5 font-semibold text-white transition hover:bg-[#0D1E3A] border border-[#152744]">
+        <Plus size={18} className="text-[#F59E0B]" />
         Create Invoice
       </DialogTrigger>
 
-      <DialogContent className="h-[95vh] w-[calc(100vw-1rem)] max-w-none overflow-x-hidden overflow-y-auto rounded-xl p-4 sm:h-[92vh] sm:w-[92vw] sm:max-w-none sm:rounded-2xl sm:p-6 lg:h-[90vh] lg:w-[92vw] lg:max-w-[1600px] lg:p-8">
+      <DialogContent className="h-[95vh] w-[calc(100vw-1rem)] max-w-none overflow-x-hidden overflow-y-auto rounded-xl p-4 sm:h-[92vh] sm:w-[92vw] sm:max-w-none sm:rounded-2xl sm:p-6 lg:h-[90vh] lg:w-[92vw] lg:max-w-[1600px] lg:p-8 border border-[#E2E8F0] bg-white">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-slate-900">
+          <DialogTitle className="text-2xl font-bold text-[#0F172A]">
             Create Invoice
           </DialogTitle>
 
-          <DialogDescription>
+          <DialogDescription className="text-xs text-[#64748B]">
             Create a new invoice for your customer.
           </DialogDescription>
         </DialogHeader>
@@ -180,14 +180,14 @@ export default function CreateInvoiceDialog() {
           {/* Customer and Dates */}
           <div className="grid gap-5 md:grid-cols-3">
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">
+              <label className="text-sm font-semibold text-[#0F172A]">
                 Customer
               </label>
 
               <select
                 value={customer}
                 onChange={(event) => setCustomer(event.target.value)}
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                className="h-11 w-full rounded-xl border border-[#E2E8F0] bg-white px-3 text-sm text-[#0F172A] outline-none transition focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20"
               >
                 <option value="">Select customer</option>
 
@@ -200,7 +200,7 @@ export default function CreateInvoiceDialog() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">
+              <label className="text-sm font-semibold text-[#0F172A]">
                 Invoice Date
               </label>
 
@@ -208,12 +208,12 @@ export default function CreateInvoiceDialog() {
                 type="date"
                 value={invoiceDate}
                 onChange={(event) => setInvoiceDate(event.target.value)}
-                className="h-11 rounded-xl"
+                className="h-11 rounded-xl border-[#E2E8F0]"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">
+              <label className="text-sm font-semibold text-[#0F172A]">
                 Due Date
               </label>
 
@@ -221,7 +221,7 @@ export default function CreateInvoiceDialog() {
                 type="date"
                 value={dueDate}
                 onChange={(event) => setDueDate(event.target.value)}
-                className="h-11 rounded-xl"
+                className="h-11 rounded-xl border-[#E2E8F0]"
               />
             </div>
           </div>
@@ -230,11 +230,11 @@ export default function CreateInvoiceDialog() {
           <div>
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-slate-900">
+                <h3 className="font-bold text-[#0F172A]">
                   Invoice Items
                 </h3>
 
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-[#64748B]">
                   Add products or services to this invoice.
                 </p>
               </div>
@@ -243,38 +243,38 @@ export default function CreateInvoiceDialog() {
                 type="button"
                 variant="outline"
                 onClick={addItem}
-                className="rounded-xl"
+                className="rounded-xl border-[#E2E8F0] text-[#0F172A] hover:bg-[#F8FAFC]"
               >
-                <Plus size={17} />
+                <Plus size={17} className="text-[#F59E0B]" />
                 Add Item
               </Button>
             </div>
 
-            <div className="w-full overflow-x-auto rounded-xl border border-slate-200">
+            <div className="w-full overflow-x-auto rounded-xl border border-[#E2E8F0]">
               <table className="w-full min-w-[900px]">
-                <thead className="bg-slate-50">
+                <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-[#64748B]">
                       Item
                     </th>
 
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-[#64748B]">
                       Description
                     </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-500">
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-[#64748B]">
                       Qty
                     </th>
 
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#64748B]">
                       Rate
                     </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-500">
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-[#64748B]">
                       Tax %
                     </th>
 
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#64748B]">
                       Amount
                     </th>
 
@@ -282,7 +282,7 @@ export default function CreateInvoiceDialog() {
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-[#E2E8F0]/60">
                   {items.map((item) => {
                     const amount = item.quantity * item.rate;
 
@@ -299,13 +299,13 @@ export default function CreateInvoiceDialog() {
                                 event.target.value
                               )
                             }
-                            className="h-10"
+                            className="h-10 border-[#E2E8F0]"
                           />
                         </td>
 
                         <td className="p-3">
                           <Input
-                            placeholder="Description"
+                            placeholder="Item description"
                             value={item.description}
                             onChange={(event) =>
                               updateItem(
@@ -314,7 +314,7 @@ export default function CreateInvoiceDialog() {
                                 event.target.value
                               )
                             }
-                            className="h-10"
+                            className="h-10 border-[#E2E8F0]"
                           />
                         </td>
 
@@ -330,7 +330,7 @@ export default function CreateInvoiceDialog() {
                                 Number(event.target.value)
                               )
                             }
-                            className="h-10 w-20"
+                            className="h-10 text-center border-[#E2E8F0]"
                           />
                         </td>
 
@@ -346,7 +346,7 @@ export default function CreateInvoiceDialog() {
                                 Number(event.target.value)
                               )
                             }
-                            className="h-10 w-32"
+                            className="h-10 text-right border-[#E2E8F0]"
                           />
                         </td>
 
@@ -362,22 +362,21 @@ export default function CreateInvoiceDialog() {
                                 Number(event.target.value)
                               )
                             }
-                            className="h-10 w-20"
+                            className="h-10 text-center border-[#E2E8F0]"
                           />
                         </td>
 
-                        <td className="p-3 text-right text-sm font-semibold text-slate-700">
+                        <td className="p-3 text-right font-medium text-[#0F172A]">
                           PKR {amount.toLocaleString()}
                         </td>
 
-                        <td className="p-3 text-right">
+                        <td className="p-3 text-center">
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
                             onClick={() => removeItem(item.id)}
-                            disabled={items.length === 1}
-                            className="text-red-500 hover:bg-red-50 hover:text-red-600"
+                            className="text-[#D93838] hover:bg-red-50 hover:text-red-700"
                           >
                             <Trash2 size={17} />
                           </Button>
@@ -394,7 +393,7 @@ export default function CreateInvoiceDialog() {
           <div className="grid gap-8 lg:grid-cols-2">
             <div className="space-y-5">
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700">
+                <label className="text-sm font-semibold text-[#0F172A]">
                   Notes
                 </label>
 
@@ -402,12 +401,12 @@ export default function CreateInvoiceDialog() {
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   placeholder="Add notes for the customer..."
-                  className="min-h-24 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  className="min-h-24 w-full rounded-xl border border-[#E2E8F0] p-3 text-sm outline-none transition focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700">
+                <label className="text-sm font-semibold text-[#0F172A]">
                   Terms & Conditions
                 </label>
 
@@ -415,34 +414,34 @@ export default function CreateInvoiceDialog() {
                   value={terms}
                   onChange={(event) => setTerms(event.target.value)}
                   placeholder="Enter payment terms..."
-                  className="min-h-24 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  className="min-h-24 w-full rounded-xl border border-[#E2E8F0] p-3 text-sm outline-none transition focus:border-[#F59E0B] focus:ring-2 focus:ring-[#F59E0B]/20"
                 />
               </div>
             </div>
 
             {/* Totals */}
-            <div className="rounded-2xl bg-slate-50 p-6">
-              <h3 className="mb-5 font-bold text-slate-900">
+            <div className="rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] p-6">
+              <h3 className="mb-5 font-bold text-[#0F172A]">
                 Invoice Summary
               </h3>
 
               <div className="space-y-4 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Subtotal</span>
-                  <span className="font-medium text-slate-800">
+                  <span className="text-[#64748B]">Subtotal</span>
+                  <span className="font-medium text-[#0F172A]">
                     PKR {subtotal.toLocaleString()}
                   </span>
                 </div>
 
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Tax</span>
-                  <span className="font-medium text-slate-800">
+                  <span className="text-[#64748B]">Tax</span>
+                  <span className="font-medium text-[#0F172A]">
                     PKR {taxTotal.toLocaleString()}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Discount</span>
+                  <span className="text-[#64748B]">Discount</span>
 
                   <Input
                     type="number"
@@ -451,17 +450,17 @@ export default function CreateInvoiceDialog() {
                     onChange={(event) =>
                       setDiscount(Number(event.target.value))
                     }
-                    className="h-10 w-36 text-right"
+                    className="h-10 w-36 text-right border-[#E2E8F0]"
                   />
                 </div>
 
-                <div className="border-t border-slate-200 pt-4">
+                <div className="border-t border-[#E2E8F0] pt-4">
                   <div className="flex justify-between">
-                    <span className="text-base font-bold text-slate-900">
+                    <span className="text-base font-bold text-[#0F172A]">
                       Total
                     </span>
 
-                    <span className="text-lg font-bold text-blue-600">
+                    <span className="text-lg font-bold text-[#F59E0B]">
                       PKR {total.toLocaleString()}
                     </span>
                   </div>
@@ -471,12 +470,12 @@ export default function CreateInvoiceDialog() {
           </div>
 
           {/* Actions */}
-          <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-3 border-t border-[#E2E8F0] pt-6 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="outline"
               onClick={handleSaveDraft}
-              className="h-11 rounded-xl"
+              className="h-11 rounded-xl border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC]"
             >
               Save as Draft
             </Button>
@@ -484,7 +483,7 @@ export default function CreateInvoiceDialog() {
             <Button
               type="button"
               onClick={handleSendInvoice}
-              className="h-11 rounded-xl bg-blue-600 px-6 font-semibold hover:bg-blue-700"
+              className="h-11 rounded-xl bg-[#0F172A] px-6 font-semibold text-white hover:bg-[#0D1E3A] border border-[#152744]"
             >
               Send Invoice
             </Button>

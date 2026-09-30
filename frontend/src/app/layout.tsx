@@ -1,16 +1,25 @@
 import type { Metadata } from "next";
-import { Hammersmith_One } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { CompanyProvider } from "@/context/CompanyContext";
 
-const hammersmithOne = Hammersmith_One({
-  variable: "--font-hammersmith-one",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-  weight: "400",
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Accounts",
-  description: "Professional accounting management application",
+  title: "Accounts - Financial Management Workspace",
+  description: "Professional multi-company accounting management application",
 };
 
 export default function RootLayout({
@@ -21,10 +30,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${hammersmithOne.variable} h-full antialiased`}
+      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col" suppressHydrationWarning>{children}</body>
+      <body className="flex min-h-full flex-col font-sans bg-[#F8FAFC] text-[#0F172A]" suppressHydrationWarning>
+        <CompanyProvider>{children}</CompanyProvider>
+      </body>
     </html>
   );
 }

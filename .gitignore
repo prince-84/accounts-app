@@ -10,3 +10,6 @@ Thumbs.db
 # IDE files
 .vscode/
 .idea/
+
+# Archives
+*.zip

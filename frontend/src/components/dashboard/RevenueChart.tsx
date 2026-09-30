@@ -10,34 +10,74 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-
 import { Card, CardContent } from "@/components/ui/card";
-import { revenueExpenseData } from "@/data/dashboard-data";
+import { useCompany } from "@/context/CompanyContext";
 
-const formatCurrency = (value: number) => {
-  return `PKR ${(value / 1000000).toFixed(1)}M`;
-};
+interface RevenueChartProps {
+  data?: { month: string; revenue: number; expenses: number }[];
+}
 
-export default function RevenueChart() {
+const DEFAULT_EMPTY_MONTHS = [
+  { month: "Jan", revenue: 0, expenses: 0 },
+  { month: "Feb", revenue: 0, expenses: 0 },
+  { month: "Mar", revenue: 0, expenses: 0 },
+  { month: "Apr", revenue: 0, expenses: 0 },
+  { month: "May", revenue: 0, expenses: 0 },
+  { month: "Jun", revenue: 0, expenses: 0 },
+  { month: "Jul", revenue: 0, expenses: 0 },
+  { month: "Aug", revenue: 0, expenses: 0 },
+  { month: "Sep", revenue: 0, expenses: 0 },
+  { month: "Oct", revenue: 0, expenses: 0 },
+  { month: "Nov", revenue: 0, expenses: 0 },
+  { month: "Dec", revenue: 0, expenses: 0 },
+];
+
+export default function RevenueChart({ data = DEFAULT_EMPTY_MONTHS }: RevenueChartProps) {
+  const { activeCompany, formatCurrency } = useCompany();
+  const chartData = data && data.length > 0 ? data : DEFAULT_EMPTY_MONTHS;
+
+  const formatShortCurrency = (val: number) => {
+    const sym = activeCompany?.currencySymbol || activeCompany?.currency || "";
+    if (Math.abs(val) >= 1000000) {
+      return `${sym} ${(val / 1000000).toFixed(1)}M`;
+    }
+    if (Math.abs(val) >= 1000) {
+      return `${sym} ${(val / 1000).toFixed(0)}k`;
+    }
+    return `${sym} ${val}`;
+  };
+
   return (
-    <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+    <Card className="rounded-lg border-[#E2E8F0] bg-white shadow-xs">
       <CardContent className="p-6">
         {/* Chart Header */}
-        <div className="mb-6">
-          <h2 className="text-lg font-bold text-slate-900">
-            Revenue vs Expenses
-          </h2>
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <h2 className="text-base font-bold text-[#0F172A]">
+              Revenue vs Expenses
+            </h2>
+            <p className="mt-0.5 text-xs text-[#64748B]">
+              Operating performance across fiscal year {new Date().getFullYear()}
+            </p>
+          </div>
 
-          <p className="mt-1 text-sm text-slate-500">
-            Financial performance over the last 12 months
-          </p>
+          <div className="flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#10B981]" />
+              <span className="text-[#64748B] text-[11px] font-medium">Revenue</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#EF4444]" />
+              <span className="text-[#64748B] text-[11px] font-medium">Expenses</span>
+            </div>
+          </div>
         </div>
 
         {/* Chart */}
-        <div className="h-[350px] w-full">
+        <div className="h-[320px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
-              data={revenueExpenseData}
+              data={chartData}
               margin={{
                 top: 10,
                 right: 10,
@@ -53,8 +93,8 @@ export default function RevenueChart() {
                   x2="0"
                   y2="1"
                 >
-                  <stop offset="5%" stopColor="#2563EB" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
                 </linearGradient>
 
                 <linearGradient
@@ -64,7 +104,7 @@ export default function RevenueChart() {
                   x2="0"
                   y2="1"
                 >
-                  <stop offset="5%" stopColor="#EF4444" stopOpacity={0.2} />
+                  <stop offset="5%" stopColor="#EF4444" stopOpacity={0.25} />
                   <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
                 </linearGradient>
               </defs>
@@ -72,51 +112,52 @@ export default function RevenueChart() {
               <CartesianGrid
                 strokeDasharray="3 3"
                 vertical={false}
-                stroke="#E2E8F0"
+                stroke="#F1F5F9"
               />
 
               <XAxis
                 dataKey="month"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: "#94A3B8", fontSize: 12 }}
+                stroke="#64748B"
+                fontSize={11}
               />
 
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: "#94A3B8", fontSize: 12 }}
-                tickFormatter={formatCurrency}
+                stroke="#64748B"
+                fontSize={11}
+                tickFormatter={formatShortCurrency}
               />
 
               <Tooltip
-                formatter={(value) =>
-                  `PKR ${Number(value).toLocaleString()}`
-                }
+                formatter={(value: any, name: any) => [
+                  formatCurrency(Number(value || 0)),
+                  name === "revenue" ? "Revenue" : "Expenses",
+                ]}
                 contentStyle={{
-                  borderRadius: "12px",
+                  borderRadius: "8px",
                   border: "1px solid #E2E8F0",
-                  boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
+                  backgroundColor: "#FFFFFF",
+                  color: "#0F172A",
+                  fontSize: "12px",
                 }}
               />
-
-              <Legend />
 
               <Area
                 type="monotone"
                 dataKey="revenue"
-                name="Revenue"
-                stroke="#2563EB"
-                strokeWidth={3}
+                stroke="#10B981"
+                strokeWidth={2}
                 fill="url(#revenueGradient)"
               />
 
               <Area
                 type="monotone"
                 dataKey="expenses"
-                name="Expenses"
                 stroke="#EF4444"
-                strokeWidth={3}
+                strokeWidth={2}
                 fill="url(#expenseGradient)"
               />
             </AreaChart>
