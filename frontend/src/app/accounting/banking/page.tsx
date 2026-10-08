@@ -5,9 +5,12 @@ import {
   ArrowLeftRight,
   Coins,
   DollarSign,
+  Download,
+  FileText,
   Landmark,
   Plus,
   Receipt,
+  Upload,
   Wallet,
   X,
 } from "lucide-react";
@@ -23,6 +26,14 @@ export default function BankingPage() {
   const [pettyCashFunds, setPettyCashFunds] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Bank Statement Modal
+  const [showStatementModal, setShowStatementModal] = useState(false);
+  const [statementBankId, setStatementBankId] = useState("");
+  const [statementOffsetId, setStatementOffsetId] = useState("");
+  const [statementFile, setStatementFile] = useState<File | null>(null);
+  const [submittingStatement, setSubmittingStatement] = useState(false);
+  const [statementError, setStatementError] = useState<string | null>(null);
 
   // Petty Cash Modal
   const [showPettyModal, setShowPettyModal] = useState(false);
@@ -56,7 +67,12 @@ export default function BankingPage() {
       api.getChartOfAccounts(),
     ])
       .then(([bankRes, pettyRes, coaRes]) => {
-        if (bankRes.success) setBankAccounts(bankRes.data || []);
+        if (bankRes.success) {
+          setBankAccounts(bankRes.data || []);
+          if (bankRes.data?.length > 0) {
+            setStatementBankId((prev) => prev || bankRes.data[0].id.toString());
+          }
+        }
         if (pettyRes.success) {
           setPettyCashFunds(pettyRes.data || []);
           if (pettyRes.data?.length > 0) {
@@ -94,6 +110,63 @@ export default function BankingPage() {
   useEffect(() => {
     loadData();
   }, [activeCompany.id]);
+
+  const handleDownloadSampleStatement = () => {
+    const csvContent =
+      "Date,Description,Reference,Withdrawal,Deposit\n" +
+      "2026-10-01,Opening Balance,REF-001,0.00,50000.00\n" +
+      "2026-10-03,Office Supplies & Stationery,CHQ-10492,1250.00,0.00\n" +
+      "2026-10-05,Customer Wire Transfer - Enterprise,WT-88192,0.00,15000.00\n" +
+      "2026-10-07,Utility Electricity Payment,AUTO-DEBIT,890.00,0.00\n";
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `bank_statement_sample_${activeCompany.code || "template"}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleStatementSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!statementFile) {
+      setStatementError("Please select a statement CSV file.");
+      return;
+    }
+    if (!statementBankId) {
+      setStatementError("Please select a bank account.");
+      return;
+    }
+
+    setSubmittingStatement(true);
+    setStatementError(null);
+
+    const formData = new FormData();
+    formData.append("file", statementFile);
+    formData.append("bank_account_id", statementBankId);
+    formData.append("company_id", activeCompany.id.toString());
+    if (statementOffsetId) {
+      formData.append("offset_account_id", statementOffsetId);
+    }
+
+    try {
+      const res = await api.importBankStatement(formData);
+      if (res.success) {
+        alert(res.message || "Bank statement imported successfully!");
+        setShowStatementModal(false);
+        setStatementFile(null);
+        loadData();
+      } else {
+        setStatementError(res.message || "Failed to import bank statement");
+      }
+    } catch (err: any) {
+      setStatementError(err.message || "An error occurred during import.");
+    } finally {
+      setSubmittingStatement(false);
+    }
+  };
 
   const handlePettySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,9 +230,22 @@ export default function BankingPage() {
         actions={
           <div className="flex items-center gap-2.5">
             <Button
+              onClick={() => {
+                setStatementError(null);
+                setStatementFile(null);
+                setShowStatementModal(true);
+              }}
+              variant="outline"
+              className="inline-flex items-center gap-2 rounded-md border-[#E2E8F0] bg-white text-xs font-semibold text-[#0F172A] hover:bg-[#F8FAFC] shadow-2xs cursor-pointer"
+            >
+              <Upload size={14} className="text-[#2563EB]" />
+              Import Statement
+            </Button>
+
+            <Button
               onClick={() => setShowTransferModal(true)}
               variant="outline"
-              className="inline-flex items-center gap-2 rounded-md border-[#E2E8F0] bg-white text-xs font-semibold text-[#0F172A] hover:bg-[#F8FAFC] shadow-2xs"
+              className="inline-flex items-center gap-2 rounded-md border-[#E2E8F0] bg-white text-xs font-semibold text-[#0F172A] hover:bg-[#F8FAFC] shadow-2xs cursor-pointer"
             >
               <ArrowLeftRight size={14} className="text-[#2563EB]" />
               Transfer Funds
@@ -582,6 +668,145 @@ export default function BankingPage() {
                 >
                   {submittingTransfer ? "Executing..." : "Transfer & Post to GL"}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* IMPORT BANK STATEMENT MODAL */}
+      {showStatementModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F172A]/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl border border-[#E2E8F0]">
+            <div className="flex items-center justify-between pb-3.5 border-b border-[#E2E8F0]">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#EFF6FF] text-[#2563EB]">
+                  <Upload size={18} />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-[#0F172A]">Import Bank Statement</h2>
+                  <p className="text-xs text-[#64748B]">
+                    Parse & post bank statement transactions to GL for {activeCompany.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowStatementModal(false)}
+                className="rounded-md p-1 text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#0F172A]"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleStatementSubmit} className="mt-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+                  Target Bank Account <span className="text-[#EF4444]">*</span>
+                </label>
+                <select
+                  required
+                  value={statementBankId}
+                  onChange={(e) => setStatementBankId(e.target.value)}
+                  className="h-9 w-full rounded-md border border-[#E2E8F0] bg-white px-3 text-xs text-[#0F172A] outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
+                >
+                  {bankAccounts.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.bank_name} - {b.account_name} ({b.account_number}) [{b.currency_code}]
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+                  Offset / Clearing Account (Optional)
+                </label>
+                <select
+                  value={statementOffsetId}
+                  onChange={(e) => setStatementOffsetId(e.target.value)}
+                  className="h-9 w-full rounded-md border border-[#E2E8F0] bg-white px-3 text-xs text-[#0F172A] outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
+                >
+                  <option value="">Auto Bank Clearing / Suspense Account</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.code} - {acc.name} ({acc.type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="rounded-lg bg-[#F8FAFC] p-3.5 border border-[#E2E8F0] space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#0F172A] flex items-center gap-1.5">
+                    <FileText size={14} className="text-[#2563EB]" />
+                    Statement Columns
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleDownloadSampleStatement}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-[#2563EB] hover:underline cursor-pointer"
+                  >
+                    <Download size={13} />
+                    Download Sample Statement
+                  </button>
+                </div>
+                <p className="text-[11px] text-[#64748B] leading-relaxed">
+                  Supported CSV headers: <code className="font-mono text-[#0F172A] bg-white px-1 py-0.5 rounded border border-[#E2E8F0]">Date</code>, <code className="font-mono text-[#0F172A] bg-white px-1 py-0.5 rounded border border-[#E2E8F0]">Description</code>, <code className="font-mono text-[#0F172A] bg-white px-1 py-0.5 rounded border border-[#E2E8F0]">Reference</code>, <code className="font-mono text-[#0F172A] bg-white px-1 py-0.5 rounded border border-[#E2E8F0]">Withdrawal</code>, <code className="font-mono text-[#0F172A] bg-white px-1 py-0.5 rounded border border-[#E2E8F0]">Deposit</code>.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+                  Select Statement CSV <span className="text-[#EF4444]">*</span>
+                </label>
+                <div className="flex items-center justify-center w-full">
+                  <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-[#CBD5E1] border-dashed rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 transition">
+                    <div className="flex flex-col items-center justify-center pt-4 pb-5">
+                      <Upload size={20} className="text-[#64748B] mb-1.5" />
+                      <p className="text-xs text-[#0F172A] font-semibold">
+                        {statementFile ? statementFile.name : "Click to select or drag & drop CSV statement"}
+                      </p>
+                      <p className="text-[10px] text-[#64748B] mt-1">
+                        {statementFile ? `${(statementFile.size / 1024).toFixed(1)} KB` : "CSV statement file"}
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) {
+                          setStatementFile(e.target.files[0]);
+                          setStatementError(null);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {statementError && (
+                <div className="rounded-lg bg-[#FEF2F2] p-3 border border-[#FCA5A5] text-xs font-medium text-[#DC2626]">
+                  {statementError}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#E2E8F0]">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowStatementModal(false)}
+                  className="h-9 rounded-md text-xs font-semibold"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submittingStatement || !statementFile}
+                  className="h-9 rounded-md bg-[#2563EB] px-4 text-xs font-bold text-white hover:bg-[#1D4ED8] cursor-pointer disabled:opacity-50"
+                >
+                  {submittingStatement ? "Importing Statement..." : "Upload & Import"}
+                </Button>
               </div>
             </form>
           </div>

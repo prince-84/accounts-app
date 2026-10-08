@@ -12,12 +12,15 @@ function getActiveCompanyId(): string {
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const companyId = getActiveCompanyId();
-  const headers = {
-    "Content-Type": "application/json",
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+  const headers: Record<string, string> = {
     "Accept": "application/json",
     "X-Company-Id": companyId,
-    ...(options.headers || {}),
+    ...((options.headers as Record<string, string>) || {}),
   };
+  if (!isFormData && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
 
   let res: Response;
   try {
@@ -88,6 +91,16 @@ export const api = {
     method: "POST",
     body: JSON.stringify(data),
   }),
+  deleteJournalEntry: (id: string | number) => request<{ success: boolean; message: string }>(`/journal-entries/${id}`, {
+    method: "DELETE",
+  }),
+  importJournalEntries: (body: FormData | any) => {
+    const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+    return request<{ success: boolean; message: string; count?: number }>("/journal-entries/import", {
+      method: "POST",
+      body: isFormData ? body : JSON.stringify(body),
+    });
+  },
 
   // Customers & Invoices
   getCustomers: () => request<{ success: boolean; data: any[] }>("/customers"),
@@ -136,4 +149,11 @@ export const api = {
     method: "POST",
     body: JSON.stringify(data),
   }),
+  importBankStatement: (body: FormData | any) => {
+    const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+    return request<{ success: boolean; message: string; data?: any }>("/banking/import-statement", {
+      method: "POST",
+      body: isFormData ? body : JSON.stringify(body),
+    });
+  },
 };

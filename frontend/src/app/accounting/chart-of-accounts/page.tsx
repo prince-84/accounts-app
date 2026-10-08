@@ -429,21 +429,29 @@ export default function ChartOfAccountsPage() {
                           : "—"}
                       </td>
 
-                      {/* Action dropdown button */}
+                      {/* Action buttons */}
                       <td className="px-4 py-3 text-center relative">
-                        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white shadow-xs">
+                        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white shadow-xs overflow-hidden">
+                          <button
+                            onClick={() => openEditModal(acc)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:text-[#2563EB] hover:bg-slate-50 cursor-pointer"
+                            title="Edit account name and details"
+                          >
+                            <Edit2 size={12} className="text-slate-500" />
+                            Edit
+                          </button>
                           <button
                             onClick={() => openAccountHistory(acc)}
-                            className="px-2.5 py-1 text-xs font-semibold text-[#2563EB] hover:bg-slate-50 rounded-l-lg cursor-pointer"
+                            className="px-2.5 py-1 text-xs font-semibold text-[#2563EB] hover:bg-slate-50 border-l border-slate-200 cursor-pointer"
                           >
-                            Account history
+                            History
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setActiveMenuId(isMenuOpen ? null : acc.id);
                             }}
-                            className="px-1.5 py-1 text-slate-500 hover:bg-slate-50 border-l border-slate-200 rounded-r-lg cursor-pointer"
+                            className="px-1.5 py-1 text-slate-500 hover:bg-slate-50 border-l border-slate-200 cursor-pointer"
                           >
                             <ChevronDown size={13} />
                           </button>

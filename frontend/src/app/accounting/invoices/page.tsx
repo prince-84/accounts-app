@@ -158,7 +158,7 @@ export default function InvoicesPage() {
     return inv.due_date && inv.due_date < todayStr && due > 0.01;
   }).length;
   const pendingCount = invoices.length - paidCount - overdueCount;
-  const settlementRate = totalInvoicedSum > 0 ? Math.round((collectedRevenueSum / totalInvoicedSum) * 100) : 100;
+  const settlementRate = totalInvoicedSum > 0 ? Math.round((collectedRevenueSum / totalInvoicedSum) * 100) : 0;
 
   // Filtered invoices
   const filteredInvoices = invoices.filter((inv) => {
@@ -235,11 +235,11 @@ export default function InvoicesPage() {
             </div>
           </div>
           <div className="mt-3 font-mono text-2xl font-bold tracking-tight text-[#0F172A]">
-            {formatCurrency(totalInvoicedSum > 0 ? totalInvoicedSum : 428950.00)}
+            {formatCurrency(totalInvoicedSum)}
           </div>
           <div className="mt-3 flex items-center gap-2 text-[11px] text-[#64748B]">
             <span className="rounded-md bg-[#F1F5F9] px-2 py-0.5 font-mono font-bold text-[#0F172A]">
-              {invoices.length > 0 ? invoices.length : 142} Total
+              {invoices.length} Total
             </span>
             <span>across active ledgers</span>
           </div>
@@ -256,13 +256,13 @@ export default function InvoicesPage() {
             </div>
           </div>
           <div className="mt-3 font-mono text-2xl font-bold tracking-tight text-[#0F172A]">
-            {formatCurrency(collectedRevenueSum > 0 ? collectedRevenueSum : 342100.00)}
+            {formatCurrency(collectedRevenueSum)}
           </div>
           <div className="mt-3 flex items-center gap-2 text-[11px] text-[#64748B]">
             <span className="rounded-md bg-[#ECFDF5] px-2 py-0.5 font-mono font-bold text-[#10B981]">
               {settlementRate}% Rate
             </span>
-            <span>{paidCount > 0 ? paidCount : 118} invoices settled</span>
+            <span>{paidCount} invoices settled</span>
           </div>
         </div>
 
@@ -277,11 +277,11 @@ export default function InvoicesPage() {
             </div>
           </div>
           <div className="mt-3 font-mono text-2xl font-bold tracking-tight text-[#0F172A]">
-            {formatCurrency(awaitingSettlementSum > 0 ? awaitingSettlementSum : 61450.00)}
+            {formatCurrency(awaitingSettlementSum)}
           </div>
           <div className="mt-3 flex items-center gap-2 text-[11px] text-[#64748B]">
             <span className="rounded-md bg-[#F0F9FF] px-2 py-0.5 font-mono font-bold text-[#0EA5E9]">
-              {pendingCount > 0 ? pendingCount : 18} Pending
+              {pendingCount} Pending
             </span>
             <span>within term window</span>
           </div>
@@ -298,11 +298,11 @@ export default function InvoicesPage() {
             </div>
           </div>
           <div className="mt-3 font-mono text-2xl font-bold tracking-tight text-[#EF4444]">
-            {formatCurrency(overdueBalanceSum > 0 ? overdueBalanceSum : 25400.00)}
+            {formatCurrency(overdueBalanceSum)}
           </div>
           <div className="mt-3 flex items-center gap-2 text-[11px] text-[#64748B]">
             <span className="rounded-md bg-[#FEF2F2] px-2 py-0.5 font-mono font-bold text-[#EF4444]">
-              {overdueCount > 0 ? overdueCount : 6} Overdue
+              {overdueCount} Overdue
             </span>
             <span>needs action</span>
           </div>
@@ -327,7 +327,7 @@ export default function InvoicesPage() {
                 statusFilter === "all" ? "bg-[#EFF6FF] text-[#2563EB] font-bold" : "bg-white text-[#64748B]"
               }`}
             >
-              {invoices.length > 0 ? invoices.length : 142}
+              {invoices.length}
             </span>
           </button>
 
@@ -345,7 +345,7 @@ export default function InvoicesPage() {
                 statusFilter === "paid" ? "bg-[#ECFDF5] text-[#10B981] font-bold" : "bg-white text-[#64748B]"
               }`}
             >
-              {paidCount > 0 ? paidCount : 116}
+              {paidCount}
             </span>
           </button>
 
@@ -363,7 +363,7 @@ export default function InvoicesPage() {
                 statusFilter === "pending" ? "bg-[#F0F9FF] text-[#0EA5E9] font-bold" : "bg-white text-[#64748B]"
               }`}
             >
-              {pendingCount > 0 ? pendingCount : 18}
+              {pendingCount}
             </span>
           </button>
 
@@ -381,7 +381,7 @@ export default function InvoicesPage() {
                 statusFilter === "overdue" ? "bg-[#FEF2F2] text-[#EF4444] font-bold" : "bg-white text-[#EF4444]"
               }`}
             >
-              {overdueCount > 0 ? overdueCount : 6}
+              {overdueCount}
             </span>
           </button>
         </div>
@@ -431,7 +431,7 @@ export default function InvoicesPage() {
             <select
               className="h-9 rounded-md border border-[#E2E8F0] bg-white px-3 pr-8 text-xs font-semibold text-[#0F172A] focus:border-[#2563EB] shadow-2xs appearance-none cursor-pointer font-mono"
             >
-              <option>{activeCompany.currency} ($)</option>
+              <option>{activeCompany.currency} ({activeCompany.currencySymbol || activeCompany.currency})</option>
               <option>USD ($)</option>
               <option>EUR (€)</option>
             </select>
@@ -607,39 +607,28 @@ export default function InvoicesPage() {
           </table>
         </div>
 
-        {/* Pagination Bar from Mockup */}
+        {/* Pagination Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-[#E2E8F0] px-5 py-3 text-xs text-[#64748B]">
           <div className="flex items-center gap-2">
-            <span>Showing 1 to {filteredInvoices.length} of {invoices.length} results</span>
-            <span>•</span>
-            <div className="flex items-center gap-1">
-              <span>Show</span>
-              <select className="rounded-md border border-[#E2E8F0] bg-white px-2 py-0.5 text-xs text-[#0F172A]">
-                <option>10</option>
-                <option>25</option>
-                <option>50</option>
-              </select>
-            </div>
+            <span>
+              Showing {filteredInvoices.length > 0 ? 1 : 0} to {filteredInvoices.length} of {filteredInvoices.length} results
+            </span>
           </div>
 
           <div className="flex items-center gap-1">
-            <button className="h-7 w-7 rounded-md border border-[#E2E8F0] flex items-center justify-center text-[#64748B] hover:bg-[#F8FAFC]">
+            <button
+              disabled
+              className="h-7 w-7 rounded-md border border-[#E2E8F0] flex items-center justify-center text-[#94A3B8] opacity-50 cursor-not-allowed"
+            >
               &lt;
             </button>
-            <button className="h-7 w-7 rounded-md bg-[#2563EB] text-white font-bold flex items-center justify-center">
+            <button className="h-7 w-7 rounded-md bg-[#2563EB] text-white font-bold flex items-center justify-center text-xs">
               1
             </button>
-            <button className="h-7 w-7 rounded-md border border-[#E2E8F0] flex items-center justify-center text-[#64748B] hover:bg-[#F8FAFC]">
-              2
-            </button>
-            <button className="h-7 w-7 rounded-md border border-[#E2E8F0] flex items-center justify-center text-[#64748B] hover:bg-[#F8FAFC]">
-              3
-            </button>
-            <span className="px-1">...</span>
-            <button className="h-7 w-7 rounded-md border border-[#E2E8F0] flex items-center justify-center text-[#64748B] hover:bg-[#F8FAFC]">
-              15
-            </button>
-            <button className="h-7 w-7 rounded-md border border-[#E2E8F0] flex items-center justify-center text-[#64748B] hover:bg-[#F8FAFC]">
+            <button
+              disabled
+              className="h-7 w-7 rounded-md border border-[#E2E8F0] flex items-center justify-center text-[#94A3B8] opacity-50 cursor-not-allowed"
+            >
               &gt;
             </button>
           </div>

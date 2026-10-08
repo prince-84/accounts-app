@@ -33,6 +33,8 @@ Route::middleware([IdentifyCompany::class])->group(function () {
     Route::get('/journal-entries', [JournalEntryController::class, 'index']);
     Route::post('/journal-entries', [JournalEntryController::class, 'store']);
     Route::get('/journal-entries/{id}', [JournalEntryController::class, 'show']);
+    Route::delete('/journal-entries/{id}', [JournalEntryController::class, 'destroy']);
+    Route::post('/journal-entries/import', [JournalEntryController::class, 'import']);
 
     // Accounts Receivable (AR): Customers & Invoices
     Route::get('/customers', [CustomerController::class, 'index']);
@@ -55,6 +57,7 @@ Route::middleware([IdentifyCompany::class])->group(function () {
     Route::get('/banking/petty-cash', [BankingController::class, 'pettyCash']);
     Route::post('/banking/petty-cash/voucher', [BankingController::class, 'createPettyCashVoucher']);
     Route::post('/banking/transfer', [BankingController::class, 'transfer']);
+    Route::post('/banking/import-statement', [BankingController::class, 'importStatement']);
 
     // Financial Reports & Live Analytics
     Route::get('/reports/trial-balance', [ReportController::class, 'trialBalance']);

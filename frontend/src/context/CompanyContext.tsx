@@ -65,7 +65,7 @@ const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>(COMPANIES_DATA);
-  const [activeCompanyId, setActiveCompanyId] = useState<string>("1");
+  const [activeCompanyId, setActiveCompanyId] = useState<string>("2");
   const [loading, setLoading] = useState<boolean>(false);
 
   const refreshCompanies = useCallback(async () => {
@@ -75,6 +75,9 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
         const mapped = res.data.map(mapBackendCompany);
         setCompanies(mapped);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("accounts_companies_cache", JSON.stringify(mapped));
+        }
       }
     } catch (err) {
       console.warn("Could not fetch remote companies, using fallback:", err);
@@ -110,6 +113,16 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("accounts_companies_cache");
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCompanies(parsed);
+          }
+        } catch {}
+      }
+
       const saved = localStorage.getItem("accounts_active_company_id");
       if (saved) {
         setActiveCompanyId(saved);

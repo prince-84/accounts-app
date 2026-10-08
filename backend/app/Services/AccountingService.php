@@ -85,7 +85,7 @@ class AccountingService
     /**
      * Update Account balance based on account type normal balance.
      */
-    protected function updateAccountBalance(int $accountId, float $debit, float $credit): void
+    public function updateAccountBalance(int $accountId, float $debit, float $credit): void
     {
         $account = ChartOfAccount::find($accountId);
         if (!$account) return;
@@ -99,6 +99,45 @@ class AccountingService
         }
 
         $account->save();
+    }
+
+    /**
+     * Reverse Account balance when a Journal Entry is deleted or reversed.
+     */
+    public function reverseAccountBalance(int $accountId, float $debit, float $credit): void
+    {
+        $account = ChartOfAccount::find($accountId);
+        if (!$account) return;
+
+        // Assets and Expenses decrease on Debit removal, increase on Credit removal
+        if (in_array($account->type, ['asset', 'expense'])) {
+            $account->current_balance -= ($debit - $credit);
+        } else {
+            $account->current_balance -= ($credit - $debit);
+        }
+
+        $account->save();
+    }
+
+    /**
+     * Delete a Journal Entry, reverting GL balances if posted.
+     */
+    public function deleteJournalEntry(int $id): bool
+    {
+        return DB::transaction(function () use ($id) {
+            $entry = JournalEntry::with('lines')->findOrFail($id);
+
+            // Revert balances for each line if posted
+            if ($entry->status === 'posted') {
+                foreach ($entry->lines as $line) {
+                    $this->reverseAccountBalance($line->account_id, (float)$line->debit, (float)$line->credit);
+                }
+            }
+
+            // Delete lines and entry
+            $entry->lines()->delete();
+            return (bool) $entry->delete();
+        });
     }
 
     /**
