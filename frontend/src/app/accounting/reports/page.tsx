@@ -1,3 +1,4 @@
+// Financial Statements Hub - Multi-period reporting engine (Monthly, Quarterly, Biannually, Annually)
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
