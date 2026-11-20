@@ -33,7 +33,9 @@ Route::middleware([IdentifyCompany::class])->group(function () {
     Route::get('/journal-entries', [JournalEntryController::class, 'index']);
     Route::post('/journal-entries', [JournalEntryController::class, 'store']);
     Route::get('/journal-entries/{id}', [JournalEntryController::class, 'show']);
+    Route::put('/journal-entries/{id}', [JournalEntryController::class, 'update']);
     Route::delete('/journal-entries/{id}', [JournalEntryController::class, 'destroy']);
+    Route::post('/journal-entries/bulk-delete', [JournalEntryController::class, 'bulkDestroy']);
     Route::post('/journal-entries/import', [JournalEntryController::class, 'import']);
 
     // Accounts Receivable (AR): Customers & Invoices

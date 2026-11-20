@@ -72,12 +72,21 @@ The application currently manages 3 legal corporate entities:
 ### 5.2 Chart of Accounts (`/accounting/chart-of-accounts`)
 - Hierarchical view grouped by Assets (1000s), Liabilities (2000s), Equity (3000s), Revenue (4000s), and Expenses (5000s).
 - System control accounts (Accounts Receivable, Accounts Payable, Retained Earnings, Tax Accounts).
-- "Add Account" modal for creating custom ledger accounts.
+- **Edit & Rename Accounts**: Click directly on any account name in the table or the dedicated **"Edit"** action button to update the account name, classification/sub-type, and description. System accounts allow safe renaming while protecting control codes and ledger invariants.
+- **Account History / Ledger Drill-down**: Immediate modal ledger displaying all historical debit/credit transactions, journal voucher references, and running balances for any account.
+- **Active / Inactive Status Toggle**: Deactivate obsolete accounts or re-enable them on demand.
+- **Hierarchy & Sub-account Creation**: Create child sub-accounts under any existing parent ledger account.
+- **Export to CSV**: Download complete Chart of Accounts structure and live balances into CSV format.
 
 ### 5.3 General Journal Vouchers (`/accounting/journal-entries`)
 - Manual Journal Voucher engine supporting JV, PV (Payment), RV (Receipt), and CV (Contra).
 - Real-time frontend and backend validation: **Total Debit MUST equal Total Credit**.
 - Automatic GL posting updating account current balances atomically.
+- **Edit & Update Journal Vouchers**: Full editing capability (`PUT /api/journal-entries/{id}`) with auto-mapped voucher lines, amounts, clean dates, and atomic reversal and re-posting of GL account balances. Accessible via Voucher Number click or dedicated Edit icon.
+- **Import Journal Entries**: Bulk CSV import with robust date parser supporting `DD-MM-YYYY`, `DD/MM/YYYY`, `DD-MM-YY` (e.g. `09-08-26`), `YYYY-MM-DD`, and Excel numeric serial formats.
+- **Overwrite / Replace Existing Vouchers**: Cleanly update and re-sync previously imported vouchers with matching reference numbers without manual line-by-line deletions.
+- **Global & Bulk Delete with Multi-Select**: Checkbox selection for individual vouchers and master "Select All" checkbox in the table header, featuring an interactive batch deletion bar (`POST /api/journal-entries/bulk-delete`) that safely deletes multiple selected vouchers and atomically reverts all corresponding General Ledger balances.
+- **Delete Single Journal Entry**: Safe single-click deletion with automatic ledger balance reversal.
 
 ### 5.4 Invoicing & Accounts Receivable (`/accounting/invoices`, `/accounting/customers`)
 - Customer Master with contact information, tax identification, and running balances.
@@ -96,12 +105,31 @@ The application currently manages 3 legal corporate entities:
 - Petty Cash Fund tracking under the Imprest system with custodian assignment.
 - "Record Petty Cash Voucher" modal posting cash disbursements directly to GL expenses.
 - "Transfer Funds" modal executing Contra Vouchers between bank accounts.
+- **Bank Statement CSV Import**: Import statements with automated transaction parsing and ledger offset matching.
 
 ### 5.7 Financial Reports Hub (`/accounting/reports`)
-- **Trial Balance**: Complete debit/credit listing with automatic integrity check (`Total Debit == Total Credit`).
-- **Profit & Loss (Income Statement)**: Operating revenue vs operating expenses yielding Net Profit/Loss.
-- **Balance Sheet**: Assets = Liabilities + Equity (incorporating current period net profit into equity).
-- **General Ledger**: Interactive account transaction ledger showing chronological debits, credits, and running balance.
+- **Multi-Period Filtering Engine**:
+  - **Monthly**: Filter any financial statement by specific calendar month (January to December) and selected year.
+  - **Quarterly**: Four-quarter statutory reporting:
+    - Q1 (Jan 01 – Mar 31)
+    - Q2 (Apr 01 – Jun 30)
+    - Q3 (Jul 01 – Sep 30)
+    - Q4 (Oct 01 – Dec 31)
+  - **Biannually (Semi-Annual)**: Shash-mahi financial closures:
+    - H1 (First Half: Jan 01 – Jun 30)
+    - H2 (Second Half: Jul 01 – Dec 31)
+  - **Annually**: Full fiscal/calendar year reporting (Jan 01 – Dec 31).
+  - **Custom Range**: Custom start and end dates with date-picker inputs.
+  - **All Time (Cumulative)**: Full ledger inception-to-date reporting.
+- **Trial Balance**:
+  - Dynamically calculates Opening Balance, Period Debits, Period Credits, and Closing Balances for the active period.
+  - Real-time balanced integrity check (`Total Debit == Total Credit`).
+- **Profit & Loss (Income Statement)**:
+  - Exact period-scoped Operating Revenue vs Operating Expenses yielding Period Net Profit/Loss (Surplus / Deficit).
+- **Balance Sheet**:
+  - Assets = Liabilities + Equity as-of the selected period's closing date, automatically rolling up the period's net operating profit into equity.
+- **General Ledger**:
+  - Interactive account ledger with Opening Balance prior to period start date, Period Debits, Period Credits, Closing Balance, and complete transaction rows with running balances.
 
 ### 5.8 Company Settings (`/accounting/settings`)
 - Corporate profile, tax identifier, fiscal year settings, and quick workspace switcher.

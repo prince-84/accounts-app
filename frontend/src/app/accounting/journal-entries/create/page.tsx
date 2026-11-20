@@ -24,6 +24,7 @@ function JournalEntryForm() {
 
   const { activeCompany, formatCurrency } = useCompany();
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [existingEntry, setExistingEntry] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -47,30 +48,52 @@ function JournalEntryForm() {
       editId ? api.getJournalEntry(editId) : Promise.resolve(null),
     ])
       .then(([accountsRes, entryRes]) => {
-        if (accountsRes.success) {
-          setAccounts(accountsRes.data || []);
+        let accs: any[] = [];
+        if (accountsRes && accountsRes.success) {
+          accs = accountsRes.data || [];
         }
+
         if (entryRes && entryRes.success && entryRes.data) {
           const entry = entryRes.data;
+          setExistingEntry(entry);
+
+          // If entry has lines with account objects, ensure they are in the accounts list
+          const rawLines = entry.lines || entry.items || [];
+          rawLines.forEach((l: any) => {
+            if (l.account && !accs.some((a: any) => a.id === l.account.id)) {
+              accs.push(l.account);
+            }
+          });
+
+          let parsedDate = new Date().toISOString().split("T")[0];
+          if (entry.entry_date) {
+            parsedDate = String(entry.entry_date).split("T")[0].split(" ")[0];
+          }
+
           setForm({
             voucher_type: entry.voucher_type || "JV",
-            entry_date: entry.entry_date || new Date().toISOString().split("T")[0],
+            entry_date: parsedDate,
             reference: entry.reference || "",
-            narration: entry.narration || "",
+            narration: entry.narration || entry.description || "",
           });
-          if (entry.items && entry.items.length > 0) {
+
+          if (rawLines.length > 0) {
             setLines(
-              entry.items.map((it: any) => ({
-                account_id: String(it.account_id || ""),
-                description: it.description || "",
+              rawLines.map((it: any) => ({
+                account_id: String(it.account_id || (it.account ? it.account.id : "")),
+                description: it.description || it.narration || entry.narration || "",
                 debit: parseFloat(it.debit) || 0,
                 credit: parseFloat(it.credit) || 0,
               }))
             );
           }
         }
+
+        setAccounts(accs);
       })
-      .catch((err) => console.error("Error loading journal entry dependencies:", err))
+      .catch((err) => {
+        console.error("Error loading journal entry dependencies:", err);
+      })
       .finally(() => setLoading(false));
   }, [activeCompany.id, editId]);
 
@@ -109,25 +132,43 @@ function JournalEntryForm() {
 
     setSubmitting(true);
     try {
-      await api.createJournalEntry({
+      const payload = {
         company_id: activeCompany.id,
-        ...form,
+        voucher_type: form.voucher_type,
+        entry_date: form.entry_date,
+        reference: form.reference,
+        narration: form.narration,
         lines: lines.map((l) => ({
           account_id: parseInt(l.account_id),
           description: l.description,
           debit: parseFloat(l.debit) || 0,
           credit: parseFloat(l.credit) || 0,
         })),
-      });
+      };
 
-      alert("Journal Voucher posted to General Ledger successfully!");
+      if (editId) {
+        await api.updateJournalEntry(editId, payload);
+        alert(`Journal Voucher "${existingEntry?.entry_number || ''}" updated successfully!`);
+      } else {
+        await api.createJournalEntry(payload);
+        alert("Journal Voucher posted to General Ledger successfully!");
+      }
       router.push("/accounting/journal-entries");
     } catch (err: any) {
-      alert(err.message || "Failed to post Journal Entry");
+      alert(err.message || (editId ? "Failed to update Journal Entry" : "Failed to post Journal Entry"));
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="rounded-lg border border-[#E2E8F0] bg-white p-16 text-center text-xs text-[#64748B] shadow-xs flex flex-col items-center justify-center gap-3 my-6">
+        <div className="w-6 h-6 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin"></div>
+        <span className="font-semibold text-slate-700">Loading journal voucher details...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -135,9 +176,9 @@ function JournalEntryForm() {
         breadcrumbs={[
           { label: "Accounting", href: "/accounting/dashboard" },
           { label: "Journal Vouchers", href: "/accounting/journal-entries" },
-          { label: editId ? "Edit Journal Entry" : "New Journal Entry" },
+          { label: editId ? `Edit ${existingEntry?.entry_number || "Journal Entry"}` : "New Journal Entry" },
         ]}
-        title={editId ? "Edit Journal Voucher" : "New Journal Voucher"}
+        title={editId ? `Edit Journal Voucher: ${existingEntry?.entry_number || ""}` : "New Journal Voucher"}
         description="Double-entry balanced posting with real-time audit verification."
         actions={
           <div className="flex items-center gap-2.5">
@@ -157,7 +198,7 @@ function JournalEntryForm() {
               className="h-9 rounded-md bg-[#0F172A] hover:bg-[#1E293B] font-semibold text-white text-xs shadow-xs transition-colors disabled:opacity-50 inline-flex items-center gap-2 cursor-pointer"
             >
               <FileSpreadsheet size={15} />
-              {submitting ? "Posting..." : "Post to General Ledger"}
+              {submitting ? "Saving..." : editId ? "Update Journal Voucher" : "Post to General Ledger"}
             </Button>
           </div>
         }
@@ -169,16 +210,27 @@ function JournalEntryForm() {
         <div className="flex items-center justify-between pb-4 border-b border-[#E2E8F0]">
           <div>
             <h2 className="text-base font-bold text-[#0F172A] tracking-tight">
-              {editId ? "Edit Voucher Details" : "Record General Journal Voucher"}
+              {editId ? `Edit Voucher Details (${existingEntry?.entry_number || "JV"})` : "Record General Journal Voucher"}
             </h2>
             <p className="text-[11px] text-[#64748B] mt-0.5">
               {activeCompany.name} ({activeCompany.currency}) — Enter debits and credits
             </p>
           </div>
 
-          <span className="rounded-md bg-[#F8FAFC] border border-[#E2E8F0] px-3 py-1 font-mono text-xs font-bold text-[#0F172A]">
-            Currency: {activeCompany.currency}
-          </span>
+          <div className="flex items-center gap-2">
+            {existingEntry?.status && (
+              <span className={`rounded-md px-2.5 py-1 text-xs font-bold uppercase ${
+                existingEntry.status === "posted"
+                  ? "bg-emerald-50 text-[#16A34A] border border-[#10B981]/20"
+                  : "bg-slate-100 text-[#64748B] border border-slate-200"
+              }`}>
+                {existingEntry.status}
+              </span>
+            )}
+            <span className="rounded-md bg-[#F8FAFC] border border-[#E2E8F0] px-3 py-1 font-mono text-xs font-bold text-[#0F172A]">
+              Currency: {activeCompany.currency}
+            </span>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6 text-xs">
@@ -380,7 +432,7 @@ function JournalEntryForm() {
               className="h-9 px-5 rounded-md bg-[#0F172A] hover:bg-[#1E293B] font-semibold text-white text-xs shadow-xs transition-colors disabled:opacity-50 inline-flex items-center gap-2 cursor-pointer"
             >
               <FileSpreadsheet size={15} />
-              {submitting ? "Posting..." : "Post to General Ledger"}
+              {submitting ? "Saving..." : editId ? "Update Journal Voucher" : "Post to General Ledger"}
             </Button>
           </div>
         </form>

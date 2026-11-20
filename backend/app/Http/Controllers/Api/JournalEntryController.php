@@ -89,11 +89,64 @@ class JournalEntryController extends Controller
 
     public function show($id): JsonResponse
     {
-        $entry = JournalEntry::with(['lines.account', 'branch', 'creator'])->findOrFail($id);
+        $entry = JournalEntry::withoutGlobalScope('company')
+            ->with([
+                'lines' => function ($q) {
+                    $q->withoutGlobalScope('company')->with(['account' => function ($aq) {
+                        $aq->withoutGlobalScope('company');
+                    }]);
+                },
+                'branch',
+                'creator',
+            ])
+            ->findOrFail($id);
+
         return response()->json([
             'success' => true,
             'data' => $entry,
         ]);
+    }
+
+    public function update(Request $request, $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'voucher_type' => 'sometimes|required|in:JV,PV,RV,CV',
+            'entry_date' => 'sometimes|required',
+            'reference' => 'nullable|string|max:50',
+            'narration' => 'sometimes|required|string',
+            'currency_code' => 'nullable|string|max:10',
+            'lines' => 'sometimes|required|array|min:2',
+            'lines.*.account_id' => 'required|exists:chart_of_accounts,id',
+            'lines.*.description' => 'nullable|string',
+            'lines.*.debit' => 'required|numeric|min:0',
+            'lines.*.credit' => 'required|numeric|min:0',
+        ]);
+
+        try {
+            $entry = $this->accountingService->updateJournalEntry(
+                (int)$id,
+                [
+                    'voucher_type' => $validated['voucher_type'] ?? null,
+                    'entry_date' => $validated['entry_date'] ?? null,
+                    'reference' => $validated['reference'] ?? null,
+                    'narration' => $validated['narration'] ?? null,
+                    'currency_code' => $validated['currency_code'] ?? null,
+                ],
+                $validated['lines'],
+                true
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Journal Voucher updated successfully',
+                'data' => $entry->load('lines.account'),
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 
     public function destroy($id): JsonResponse
@@ -108,6 +161,59 @@ class JournalEntryController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function bulkDestroy(Request $request): JsonResponse
+    {
+        $companyId = $request->header('X-Company-Id') 
+            ?? $request->input('company_id') 
+            ?? (app()->bound('activeCompany') ? app('activeCompany')->id : null);
+
+        if (!$companyId) {
+            return response()->json(['success' => false, 'message' => 'Company identification required.'], 422);
+        }
+
+        $deleteAll = filter_var($request->input('all', false), FILTER_VALIDATE_BOOLEAN);
+
+        if ($deleteAll) {
+            $entries = JournalEntry::where('company_id', $companyId)->get();
+            $ids = $entries->pluck('id')->toArray();
+        } else {
+            $validated = $request->validate([
+                'ids' => 'required|array|min:1',
+                'ids.*' => 'required|integer',
+            ]);
+            $ids = $validated['ids'];
+        }
+
+        if (empty($ids)) {
+            return response()->json(['success' => false, 'message' => 'No journal entries selected for deletion.'], 422);
+        }
+
+        $deletedCount = 0;
+        DB::beginTransaction();
+        try {
+            foreach ($ids as $id) {
+                $entry = JournalEntry::where('company_id', $companyId)->where('id', $id)->first();
+                if ($entry) {
+                    $this->accountingService->deleteJournalEntry((int)$id);
+                    $deletedCount++;
+                }
+            }
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully deleted {$deletedCount} journal entries and reverted all ledger balances.",
+                'count' => $deletedCount,
+            ]);
+        } catch (Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Bulk deletion failed: ' . $e->getMessage(),
             ], 422);
         }
     }
@@ -172,7 +278,8 @@ class JournalEntryController extends Controller
         // Group rows by voucher
         $groups = [];
         foreach ($rawRows as $idx => $row) {
-            $date = $row['date'] ?? $row['entrydate'] ?? $row['voucherdate'] ?? date('Y-m-d');
+            $rawDate = $row['date'] ?? $row['entrydate'] ?? $row['voucherdate'] ?? date('Y-m-d');
+            $date = \App\Services\AccountingService::parseFlexibleDate($rawDate);
             $ref = $row['reference'] ?? $row['ref'] ?? $row['voucherno'] ?? $row['voucher'] ?? $row['entrynumber'] ?? '';
             $narration = $row['narration'] ?? $row['description'] ?? $row['memo'] ?? 'Imported Journal Voucher';
             $accIdentifier = $row['accountcode'] ?? $row['code'] ?? $row['account'] ?? $row['accountname'] ?? '';
@@ -195,7 +302,7 @@ class JournalEntryController extends Controller
                 $groups[$groupKey] = [
                     'company_id' => $companyId,
                     'voucher_type' => 'JV',
-                    'entry_date' => date('Y-m-d', strtotime($date)),
+                    'entry_date' => $date,
                     'reference' => $ref ?: 'IMPORT',
                     'narration' => $narration,
                     'lines' => [],
@@ -209,6 +316,8 @@ class JournalEntryController extends Controller
                 'credit' => $credit,
             ];
         }
+
+        $overwrite = filter_var($request->input('overwrite', false), FILTER_VALIDATE_BOOLEAN);
 
         // Validate balancing and create each voucher
         $created = [];
@@ -224,6 +333,16 @@ class JournalEntryController extends Controller
 
                 if (count($group['lines']) < 2) {
                     throw new Exception("Voucher '{$group['reference']}' must have at least 2 lines (debit and credit).");
+                }
+
+                // If overwrite requested, delete any existing journal entry with this reference
+                if ($overwrite && !empty($group['reference']) && $group['reference'] !== 'IMPORT') {
+                    $existing = JournalEntry::where('company_id', $group['company_id'])
+                        ->where('reference', $group['reference'])
+                        ->get();
+                    foreach ($existing as $oldEntry) {
+                        $this->accountingService->deleteJournalEntry($oldEntry->id);
+                    }
                 }
 
                 $entry = $this->accountingService->createJournalEntry(

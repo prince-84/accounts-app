@@ -191,12 +191,17 @@ export default function ChartOfAccountsPage() {
     revenue: "Revenue",
     expense: "Expenses",
     cash_bank: "Cash and cash equivalents",
+    bank_cash: "Cash and cash equivalents",
     accounts_receivable: "Accounts receivable (A/R)",
+    tax_receivable: "Tax receivable (Input VAT)",
     current_asset: "Current assets",
+    fixed_asset: "Fixed assets",
     accounts_payable: "Accounts payable (A/P)",
+    tax_payable: "Tax payable (Output VAT)",
     current_liability: "Current liabilities",
     operating_revenue: "Operating revenue",
     operating_expense: "Operating expenses",
+    other: "Other",
   };
 
   const toggleSelectAll = () => {
@@ -379,13 +384,17 @@ export default function ChartOfAccountsPage() {
                               <span className="font-mono text-[11px] font-semibold text-slate-500">
                                 {acc.code}
                               </span>
-                              <span
-                                className={`font-semibold ${
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(acc)}
+                                className={`text-left group/name inline-flex items-center gap-1.5 font-semibold hover:text-[#2563EB] cursor-pointer transition-colors ${
                                   !isChild ? "text-slate-900 font-bold" : "text-slate-700"
                                 }`}
+                                title="Click to edit account name and details"
                               >
-                                {acc.name}
-                              </span>
+                                <span>{acc.name}</span>
+                                <Edit2 size={11} className="opacity-0 group-hover/name:opacity-100 text-[#2563EB] transition-opacity" />
+                              </button>
                               {acc.is_system && (
                                 <span
                                   title="System Control Account"
@@ -545,6 +554,15 @@ export default function ChartOfAccountsPage() {
               </button>
             </div>
 
+            {editingAccount?.is_system && (
+              <div className="mt-3 rounded-md bg-amber-50 border border-amber-200/80 p-2.5 text-[11px] text-amber-800 flex items-center gap-2">
+                <ShieldCheck size={14} className="shrink-0 text-amber-600" />
+                <span>
+                  <strong>System Control Account:</strong> You can customize the account name and description. System code and classification are locked to maintain ledger consistency.
+                </span>
+              </div>
+            )}
+
             <form onSubmit={handleSaveAccount} className="mt-4 space-y-3.5">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -581,8 +599,9 @@ export default function ChartOfAccountsPage() {
                   </label>
                   <select
                     value={formData.type}
+                    disabled={editingAccount?.is_system}
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="h-9 w-full rounded-md border border-[#E2E8F0] bg-white px-3 text-xs text-[#0F172A] outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
+                    className="h-9 w-full rounded-md border border-[#E2E8F0] bg-white px-3 text-xs text-[#0F172A] outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] disabled:bg-[#F8FAFC]"
                   >
                     <option value="asset">Asset</option>
                     <option value="liability">Liability</option>
@@ -596,15 +615,19 @@ export default function ChartOfAccountsPage() {
                   <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">Sub-Type / Classification</label>
                   <select
                     value={formData.sub_type}
+                    disabled={editingAccount?.is_system}
                     onChange={(e) => setFormData({ ...formData, sub_type: e.target.value })}
-                    className="h-9 w-full rounded-md border border-[#E2E8F0] bg-white px-3 text-xs text-[#0F172A] outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
+                    className="h-9 w-full rounded-md border border-[#E2E8F0] bg-white px-3 text-xs text-[#0F172A] outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] disabled:bg-[#F8FAFC]"
                   >
                     <option value="bank_cash">Cash and bank</option>
                     <option value="accounts_receivable">Accounts receivable (A/R)</option>
+                    <option value="tax_receivable">Tax receivable (Input VAT)</option>
                     <option value="current_asset">Current assets</option>
                     <option value="fixed_asset">Fixed assets</option>
                     <option value="accounts_payable">Accounts payable (A/P)</option>
+                    <option value="tax_payable">Tax payable (Output VAT)</option>
                     <option value="current_liability">Current liabilities</option>
+                    <option value="equity">Equity</option>
                     <option value="operating_revenue">Operating revenue</option>
                     <option value="operating_expense">Operating expense</option>
                     <option value="other">Other</option>

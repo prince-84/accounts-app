@@ -64,11 +64,35 @@ export const api = {
 
   // Dashboard & Reports
   getDashboardSummary: () => request<{ success: boolean; data: any }>("/reports/dashboard-summary"),
-  getTrialBalance: () => request<{ success: boolean; data: any }>("/reports/trial-balance"),
-  getIncomeStatement: () => request<{ success: boolean; data: any }>("/reports/income-statement"),
-  getBalanceSheet: () => request<{ success: boolean; data: any }>("/reports/balance-sheet"),
-  getLedger: (accountId?: number | string) =>
-    request<{ success: boolean; data: any }>(`/reports/ledger${accountId ? `?account_id=${accountId}` : ""}`),
+  getTrialBalance: (params?: { start_date?: string; end_date?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.start_date) q.append("start_date", params.start_date);
+    if (params?.end_date) q.append("end_date", params.end_date);
+    const qs = q.toString();
+    return request<{ success: boolean; data: any }>(`/reports/trial-balance${qs ? `?${qs}` : ""}`);
+  },
+  getIncomeStatement: (params?: { start_date?: string; end_date?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.start_date) q.append("start_date", params.start_date);
+    if (params?.end_date) q.append("end_date", params.end_date);
+    const qs = q.toString();
+    return request<{ success: boolean; data: any }>(`/reports/income-statement${qs ? `?${qs}` : ""}`);
+  },
+  getBalanceSheet: (params?: { start_date?: string; end_date?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.start_date) q.append("start_date", params.start_date);
+    if (params?.end_date) q.append("end_date", params.end_date);
+    const qs = q.toString();
+    return request<{ success: boolean; data: any }>(`/reports/balance-sheet${qs ? `?${qs}` : ""}`);
+  },
+  getLedger: (accountId?: number | string, params?: { start_date?: string; end_date?: string }) => {
+    const q = new URLSearchParams();
+    if (accountId) q.append("account_id", accountId.toString());
+    if (params?.start_date) q.append("start_date", params.start_date);
+    if (params?.end_date) q.append("end_date", params.end_date);
+    const qs = q.toString();
+    return request<{ success: boolean; data: any }>(`/reports/ledger${qs ? `?${qs}` : ""}`);
+  },
 
   // Chart of Accounts
   getChartOfAccounts: () => request<{ success: boolean; data: any[]; grouped: any }>("/chart-of-accounts"),
@@ -91,9 +115,18 @@ export const api = {
     method: "POST",
     body: JSON.stringify(data),
   }),
+  updateJournalEntry: (id: string | number, data: any) => request<{ success: boolean; data: any; message?: string }>(`/journal-entries/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  }),
   deleteJournalEntry: (id: string | number) => request<{ success: boolean; message: string }>(`/journal-entries/${id}`, {
     method: "DELETE",
   }),
+  bulkDeleteJournalEntries: (data: { ids?: number[]; all?: boolean }) =>
+    request<{ success: boolean; message: string; count?: number }>("/journal-entries/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   importJournalEntries: (body: FormData | any) => {
     const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
     return request<{ success: boolean; message: string; count?: number }>("/journal-entries/import", {

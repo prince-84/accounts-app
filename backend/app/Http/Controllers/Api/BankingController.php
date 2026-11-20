@@ -209,7 +209,8 @@ class BankingController extends Controller
             $netChange = 0.0;
 
             foreach ($rawRows as $idx => $row) {
-                $date = $row['date'] ?? $row['valuedate'] ?? $row['bookingdate'] ?? date('Y-m-d');
+                $rawDate = $row['date'] ?? $row['valuedate'] ?? $row['bookingdate'] ?? date('Y-m-d');
+                $date = \App\Services\AccountingService::parseFlexibleDate($rawDate);
                 $desc = $row['description'] ?? $row['narration'] ?? $row['particulars'] ?? $row['details'] ?? 'Bank statement transaction';
                 $ref = $row['reference'] ?? $row['ref'] ?? $row['chequeno'] ?? $row['transid'] ?? 'STATEMENT';
 
@@ -235,7 +236,7 @@ class BankingController extends Controller
                     $this->accountingService->createJournalEntry([
                         'company_id' => $companyId,
                         'voucher_type' => 'CV',
-                        'entry_date' => date('Y-m-d', strtotime($date)),
+                        'entry_date' => $date,
                         'reference' => $ref,
                         'narration' => $desc,
                     ], [
@@ -260,7 +261,7 @@ class BankingController extends Controller
                     $this->accountingService->createJournalEntry([
                         'company_id' => $companyId,
                         'voucher_type' => 'CV',
-                        'entry_date' => date('Y-m-d', strtotime($date)),
+                        'entry_date' => $date,
                         'reference' => $ref,
                         'narration' => $desc,
                     ], [

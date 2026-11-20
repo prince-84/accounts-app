@@ -19,6 +19,58 @@ use Illuminate\Support\Facades\DB;
 class AccountingService
 {
     /**
+     * Robust accounting date parser that accurately handles:
+     * - DD-MM-YYYY, DD/MM/YYYY, DD.MM.YYYY
+     * - DD-MM-YY, DD/MM/YY, DD.MM.YY (2-digit years: 26 -> 2026)
+     * - YYYY-MM-DD, YYYY/MM/DD, YYYY.MM.DD
+     * - Excel numeric serial dates (e.g. 45513)
+     * - Standard human text dates (e.g. "26 Aug 2026", "August 26, 2026")
+     */
+    public static function parseFlexibleDate(?string $rawDate): string
+    {
+        if (empty($rawDate)) {
+            return date('Y-m-d');
+        }
+
+        $str = trim((string)$rawDate);
+        if ($str === '') {
+            return date('Y-m-d');
+        }
+
+        // 1. Excel numeric serial date (e.g. 30000 - 80000)
+        if (is_numeric($str) && (float)$str > 30000 && (float)$str < 80000) {
+            $timestamp = ((float)$str - 25569) * 86400;
+            return gmdate('Y-m-d', (int)$timestamp);
+        }
+
+        // 2. YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD (4-digit year at start)
+        if (preg_match('/^(\d{4})[-\/\.](\d{1,2})[-\/\.](\d{1,2})$/', $str, $m)) {
+            return sprintf('%04d-%02d-%02d', (int)$m[1], (int)$m[2], (int)$m[3]);
+        }
+
+        // 3. DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY (4-digit year at end)
+        if (preg_match('/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{4})$/', $str, $m)) {
+            return sprintf('%04d-%02d-%02d', (int)$m[3], (int)$m[2], (int)$m[1]);
+        }
+
+        // 4. DD-MM-YY or DD/MM/YY or DD.MM.YY (2-digit year at end)
+        if (preg_match('/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{2})$/', $str, $m)) {
+            $shortYear = (int)$m[3];
+            $year = $shortYear < 70 ? (2000 + $shortYear) : (1900 + $shortYear);
+            return sprintf('%04d-%02d-%02d', $year, (int)$m[2], (int)$m[1]);
+        }
+
+        // 5. Fallback: replace '/' or '.' with '-' so strtotime treats European day-first
+        $dashStr = str_replace(['/', '.'], '-', $str);
+        $ts = strtotime($dashStr);
+        if ($ts !== false && $ts > 0) {
+            return date('Y-m-d', $ts);
+        }
+
+        return date('Y-m-d');
+    }
+
+    /**
      * Create and post a balanced General Journal Entry.
      */
     public function createJournalEntry(array $data, array $lines, bool $autoPost = true): JournalEntry
@@ -26,6 +78,9 @@ class AccountingService
         return DB::transaction(function () use ($data, $lines, $autoPost) {
             $companyId = $data['company_id'];
             $company = Company::findOrFail($companyId);
+
+            // Normalize entry date
+            $data['entry_date'] = self::parseFlexibleDate($data['entry_date'] ?? null);
 
             // Calculate debit and credit
             $totalDebit = 0;
@@ -117,6 +172,77 @@ class AccountingService
         }
 
         $account->save();
+    }
+
+    /**
+     * Update an existing General Journal Entry.
+     */
+    public function updateJournalEntry(int $id, array $data, array $lines, bool $autoPost = true): JournalEntry
+    {
+        return DB::transaction(function () use ($id, $data, $lines, $autoPost) {
+            $entry = JournalEntry::withoutGlobalScope('company')->with(['lines' => function ($q) {
+                $q->withoutGlobalScope('company');
+            }])->findOrFail($id);
+            $companyId = $entry->company_id;
+
+            // 1. Calculate new debit and credit totals
+            $totalDebit = 0;
+            $totalCredit = 0;
+            foreach ($lines as $line) {
+                $totalDebit += (float) ($line['debit'] ?? 0);
+                $totalCredit += (float) ($line['credit'] ?? 0);
+            }
+
+            if (abs($totalDebit - $totalCredit) > 0.001) {
+                throw new Exception("Unbalanced Journal Entry! Total Debit ({$totalDebit}) must equal Total Credit ({$totalCredit}).");
+            }
+
+            // 2. Revert previous balances if posted
+            if ($entry->status === 'posted') {
+                foreach ($entry->lines as $oldLine) {
+                    $this->reverseAccountBalance($oldLine->account_id, (float)$oldLine->debit, (float)$oldLine->credit);
+                }
+            }
+
+            // 3. Delete existing lines
+            $entry->lines()->delete();
+
+            // 4. Update entry header
+            $entryDate = isset($data['entry_date']) ? self::parseFlexibleDate($data['entry_date']) : $entry->entry_date;
+            $entry->update([
+                'voucher_type' => $data['voucher_type'] ?? $entry->voucher_type,
+                'entry_date' => $entryDate,
+                'reference' => $data['reference'] ?? $entry->reference,
+                'narration' => $data['narration'] ?? $entry->narration,
+                'total_debit' => $totalDebit,
+                'total_credit' => $totalCredit,
+                'status' => $autoPost ? 'posted' : 'draft',
+                'posted_at' => $autoPost ? ($entry->posted_at ?? now()) : null,
+            ]);
+
+            // 5. Create new lines and post new balances
+            $exchangeRate = (float) $entry->exchange_rate;
+            foreach ($lines as $line) {
+                $debit = (float) ($line['debit'] ?? 0);
+                $credit = (float) ($line['credit'] ?? 0);
+
+                JournalEntryLine::create([
+                    'company_id' => $companyId,
+                    'journal_entry_id' => $entry->id,
+                    'account_id' => $line['account_id'],
+                    'description' => $line['description'] ?? $entry->narration,
+                    'debit' => $debit,
+                    'credit' => $credit,
+                    'base_currency_amount' => ($debit > 0 ? $debit : $credit) * $exchangeRate,
+                ]);
+
+                if ($autoPost) {
+                    $this->updateAccountBalance($line['account_id'], $debit, $credit);
+                }
+            }
+
+            return $entry->fresh(['lines.account']);
+        });
     }
 
     /**

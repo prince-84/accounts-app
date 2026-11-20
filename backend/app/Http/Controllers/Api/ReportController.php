@@ -19,49 +19,176 @@ use Illuminate\Support\Facades\DB;
 class ReportController extends Controller
 {
     /**
+     * Helper to get debit/credit aggregates grouped by account_id for posted entries within an optional date range.
+     */
+    private function getPeriodAggregates(?string $startDate = null, ?string $endDate = null)
+    {
+        $query = JournalEntryLine::query()
+            ->join('journal_entries', 'journal_entry_lines.journal_entry_id', '=', 'journal_entries.id')
+            ->where('journal_entries.status', 'posted');
+
+        $companyId = request()->header('X-Company-Id') 
+            ?? request()->query('company_id') 
+            ?? session('active_company_id');
+        if ($companyId) {
+            $query->where('journal_entry_lines.company_id', $companyId);
+        }
+
+        if ($startDate) {
+            $query->where('journal_entries.entry_date', '>=', $startDate);
+        }
+        if ($endDate) {
+            $query->where('journal_entries.entry_date', '<=', $endDate);
+        }
+
+        return $query->select(
+            'journal_entry_lines.account_id',
+            DB::raw('SUM(journal_entry_lines.debit) as total_debit'),
+            DB::raw('SUM(journal_entry_lines.credit) as total_credit')
+        )->groupBy('journal_entry_lines.account_id')->get()->keyBy('account_id');
+    }
+
+    /**
      * Trial Balance Report.
      */
     public function trialBalance(Request $request): JsonResponse
     {
+        $startDate = $request->query('start_date') ?: $request->query('from_date');
+        $endDate = $request->query('end_date') ?: $request->query('to_date');
+
         $accounts = ChartOfAccount::orderBy('code')->get();
 
         $rows = [];
         $totalDebit = 0;
         $totalCredit = 0;
+        $totalPeriodDebit = 0;
+        $totalPeriodCredit = 0;
 
-        foreach ($accounts as $account) {
-            $balance = (float) $account->current_balance;
+        if ($startDate || $endDate) {
+            // Calculate balances according to selected date period
+            $priorAggregates = null;
+            if ($startDate) {
+                $priorQuery = JournalEntryLine::query()
+                    ->join('journal_entries', 'journal_entry_lines.journal_entry_id', '=', 'journal_entries.id')
+                    ->where('journal_entries.status', 'posted')
+                    ->where('journal_entries.entry_date', '<', $startDate);
 
-            $debit = 0;
-            $credit = 0;
-
-            if (in_array($account->type, ['asset', 'expense'])) {
-                if ($balance >= 0) {
-                    $debit = $balance;
-                } else {
-                    $credit = abs($balance);
+                $companyId = request()->header('X-Company-Id') 
+                    ?? request()->query('company_id') 
+                    ?? session('active_company_id');
+                if ($companyId) {
+                    $priorQuery->where('journal_entry_lines.company_id', $companyId);
                 }
-            } else {
-                if ($balance >= 0) {
-                    $credit = $balance;
-                } else {
-                    $debit = abs($balance);
-                }
+
+                $priorAggregates = $priorQuery->select(
+                    'journal_entry_lines.account_id',
+                    DB::raw('SUM(journal_entry_lines.debit) as total_debit'),
+                    DB::raw('SUM(journal_entry_lines.credit) as total_credit')
+                )->groupBy('journal_entry_lines.account_id')->get()->keyBy('account_id');
             }
 
-            if ($debit > 0 || $credit > 0) {
-                $rows[] = [
-                    'id' => $account->id,
-                    'code' => $account->code,
-                    'name' => $account->name,
-                    'type' => $account->type,
-                    'sub_type' => $account->sub_type,
-                    'debit' => $debit,
-                    'credit' => $credit,
-                ];
+            $periodAggregates = $this->getPeriodAggregates($startDate, $endDate);
 
-                $totalDebit += $debit;
-                $totalCredit += $credit;
+            foreach ($accounts as $account) {
+                $isDebitNormal = in_array($account->type, ['asset', 'expense']);
+
+                // Calculate opening balance prior to startDate
+                $priorDeb = (float) ($priorAggregates[$account->id]->total_debit ?? 0);
+                $priorCred = (float) ($priorAggregates[$account->id]->total_credit ?? 0);
+                $initialOp = (float) $account->opening_balance;
+
+                $opBalance = $isDebitNormal 
+                    ? ($initialOp + $priorDeb - $priorCred)
+                    : ($initialOp + $priorCred - $priorDeb);
+
+                // Activity in period
+                $pDeb = (float) ($periodAggregates[$account->id]->total_debit ?? 0);
+                $pCred = (float) ($periodAggregates[$account->id]->total_credit ?? 0);
+
+                // Closing balance as of endDate
+                $clBalance = $isDebitNormal 
+                    ? ($opBalance + $pDeb - $pCred)
+                    : ($opBalance + $pCred - $pDeb);
+
+                $debit = 0;
+                $credit = 0;
+                if ($isDebitNormal) {
+                    if ($clBalance >= 0) {
+                        $debit = $clBalance;
+                    } else {
+                        $credit = abs($clBalance);
+                    }
+                } else {
+                    if ($clBalance >= 0) {
+                        $credit = $clBalance;
+                    } else {
+                        $debit = abs($clBalance);
+                    }
+                }
+
+                if ($debit > 0 || $credit > 0 || $pDeb > 0 || $pCred > 0 || abs($opBalance) > 0) {
+                    $rows[] = [
+                        'id' => $account->id,
+                        'code' => $account->code,
+                        'name' => $account->name,
+                        'type' => $account->type,
+                        'sub_type' => $account->sub_type,
+                        'opening_balance' => $opBalance,
+                        'period_debit' => $pDeb,
+                        'period_credit' => $pCred,
+                        'closing_balance' => $clBalance,
+                        'debit' => $debit,
+                        'credit' => $credit,
+                    ];
+
+                    $totalDebit += $debit;
+                    $totalCredit += $credit;
+                    $totalPeriodDebit += $pDeb;
+                    $totalPeriodCredit += $pCred;
+                }
+            }
+        } else {
+            // All-time cumulative balances
+            foreach ($accounts as $account) {
+                $balance = (float) $account->current_balance;
+
+                $debit = 0;
+                $credit = 0;
+
+                if (in_array($account->type, ['asset', 'expense'])) {
+                    if ($balance >= 0) {
+                        $debit = $balance;
+                    } else {
+                        $credit = abs($balance);
+                    }
+                } else {
+                    if ($balance >= 0) {
+                        $credit = $balance;
+                    } else {
+                        $debit = abs($balance);
+                    }
+                }
+
+                if ($debit > 0 || $credit > 0) {
+                    $rows[] = [
+                        'id' => $account->id,
+                        'code' => $account->code,
+                        'name' => $account->name,
+                        'type' => $account->type,
+                        'sub_type' => $account->sub_type,
+                        'opening_balance' => (float) $account->opening_balance,
+                        'period_debit' => $debit,
+                        'period_credit' => $credit,
+                        'closing_balance' => $balance,
+                        'debit' => $debit,
+                        'credit' => $credit,
+                    ];
+
+                    $totalDebit += $debit;
+                    $totalCredit += $credit;
+                    $totalPeriodDebit += $debit;
+                    $totalPeriodCredit += $credit;
+                }
             }
         }
 
@@ -70,9 +197,13 @@ class ReportController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
+                'start_date' => $startDate,
+                'end_date' => $endDate,
                 'rows' => $rows,
                 'total_debit' => $totalDebit,
                 'total_credit' => $totalCredit,
+                'total_period_debit' => $totalPeriodDebit,
+                'total_period_credit' => $totalPeriodCredit,
                 'difference' => abs($totalDebit - $totalCredit),
                 'is_balanced' => $isBalanced,
             ],
@@ -84,31 +215,57 @@ class ReportController extends Controller
      */
     public function incomeStatement(Request $request): JsonResponse
     {
+        $startDate = $request->query('start_date') ?: $request->query('from_date');
+        $endDate = $request->query('end_date') ?: $request->query('to_date');
+
         $revenueAccounts = ChartOfAccount::where('type', 'revenue')->orderBy('code')->get();
         $expenseAccounts = ChartOfAccount::where('type', 'expense')->orderBy('code')->get();
+
+        $aggregates = null;
+        if ($startDate || $endDate) {
+            $aggregates = $this->getPeriodAggregates($startDate, $endDate);
+        }
 
         $totalRevenue = 0;
         $revenues = [];
         foreach ($revenueAccounts as $acc) {
-            $val = (float) $acc->current_balance;
-            $revenues[] = [
-                'code' => $acc->code,
-                'name' => $acc->name,
-                'amount' => $val,
-            ];
-            $totalRevenue += $val;
+            if ($aggregates !== null) {
+                $deb = (float) ($aggregates[$acc->id]->total_debit ?? 0);
+                $cred = (float) ($aggregates[$acc->id]->total_credit ?? 0);
+                $val = $cred - $deb;
+            } else {
+                $val = (float) $acc->current_balance;
+            }
+
+            if (abs($val) > 0.001 || $aggregates === null) {
+                $revenues[] = [
+                    'code' => $acc->code,
+                    'name' => $acc->name,
+                    'amount' => $val,
+                ];
+                $totalRevenue += $val;
+            }
         }
 
         $totalExpense = 0;
         $expenses = [];
         foreach ($expenseAccounts as $acc) {
-            $val = (float) $acc->current_balance;
-            $expenses[] = [
-                'code' => $acc->code,
-                'name' => $acc->name,
-                'amount' => $val,
-            ];
-            $totalExpense += $val;
+            if ($aggregates !== null) {
+                $deb = (float) ($aggregates[$acc->id]->total_debit ?? 0);
+                $cred = (float) ($aggregates[$acc->id]->total_credit ?? 0);
+                $val = $deb - $cred;
+            } else {
+                $val = (float) $acc->current_balance;
+            }
+
+            if (abs($val) > 0.001 || $aggregates === null) {
+                $expenses[] = [
+                    'code' => $acc->code,
+                    'name' => $acc->name,
+                    'amount' => $val,
+                ];
+                $totalExpense += $val;
+            }
         }
 
         $netProfit = $totalRevenue - $totalExpense;
@@ -116,6 +273,8 @@ class ReportController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
+                'start_date' => $startDate,
+                'end_date' => $endDate,
                 'revenues' => $revenues,
                 'total_revenue' => $totalRevenue,
                 'expenses' => $expenses,
@@ -130,19 +289,30 @@ class ReportController extends Controller
      */
     public function balanceSheet(Request $request): JsonResponse
     {
+        $startDate = $request->query('start_date') ?: $request->query('from_date');
+        $endDate = $request->query('end_date') ?: $request->query('to_date');
+
         $assetAccounts = ChartOfAccount::where('type', 'asset')->orderBy('code')->get();
         $liabilityAccounts = ChartOfAccount::where('type', 'liability')->orderBy('code')->get();
         $equityAccounts = ChartOfAccount::where('type', 'equity')->orderBy('code')->get();
 
-        // Calculate Net Profit
-        $totalRevenue = (float) ChartOfAccount::where('type', 'revenue')->sum('current_balance');
-        $totalExpense = (float) ChartOfAccount::where('type', 'expense')->sum('current_balance');
-        $currentPeriodNetProfit = $totalRevenue - $totalExpense;
+        $aggregates = null;
+        if ($endDate) {
+            // All posted entries up to $endDate
+            $aggregates = $this->getPeriodAggregates(null, $endDate);
+        }
 
         $totalAssets = 0;
         $assets = [];
         foreach ($assetAccounts as $acc) {
-            $val = (float) $acc->current_balance;
+            if ($aggregates !== null) {
+                $deb = (float) ($aggregates[$acc->id]->total_debit ?? 0);
+                $cred = (float) ($aggregates[$acc->id]->total_credit ?? 0);
+                $val = (float) $acc->opening_balance + ($deb - $cred);
+            } else {
+                $val = (float) $acc->current_balance;
+            }
+
             $assets[] = [
                 'code' => $acc->code,
                 'name' => $acc->name,
@@ -155,7 +325,14 @@ class ReportController extends Controller
         $totalLiabilities = 0;
         $liabilities = [];
         foreach ($liabilityAccounts as $acc) {
-            $val = (float) $acc->current_balance;
+            if ($aggregates !== null) {
+                $deb = (float) ($aggregates[$acc->id]->total_debit ?? 0);
+                $cred = (float) ($aggregates[$acc->id]->total_credit ?? 0);
+                $val = (float) $acc->opening_balance + ($cred - $deb);
+            } else {
+                $val = (float) $acc->current_balance;
+            }
+
             $liabilities[] = [
                 'code' => $acc->code,
                 'name' => $acc->name,
@@ -168,7 +345,14 @@ class ReportController extends Controller
         $totalEquity = 0;
         $equity = [];
         foreach ($equityAccounts as $acc) {
-            $val = (float) $acc->current_balance;
+            if ($aggregates !== null) {
+                $deb = (float) ($aggregates[$acc->id]->total_debit ?? 0);
+                $cred = (float) ($aggregates[$acc->id]->total_credit ?? 0);
+                $val = (float) $acc->opening_balance + ($cred - $deb);
+            } else {
+                $val = (float) $acc->current_balance;
+            }
+
             $equity[] = [
                 'code' => $acc->code,
                 'name' => $acc->name,
@@ -178,6 +362,30 @@ class ReportController extends Controller
             $totalEquity += $val;
         }
 
+        // Calculate Net Profit up to endDate or all-time
+        if ($aggregates !== null) {
+            $revAccs = ChartOfAccount::where('type', 'revenue')->pluck('id');
+            $expAccs = ChartOfAccount::where('type', 'expense')->pluck('id');
+
+            $totalRevenue = 0;
+            foreach ($revAccs as $revId) {
+                $deb = (float) ($aggregates[$revId]->total_debit ?? 0);
+                $cred = (float) ($aggregates[$revId]->total_credit ?? 0);
+                $totalRevenue += ($cred - $deb);
+            }
+
+            $totalExpense = 0;
+            foreach ($expAccs as $expId) {
+                $deb = (float) ($aggregates[$expId]->total_debit ?? 0);
+                $cred = (float) ($aggregates[$expId]->total_credit ?? 0);
+                $totalExpense += ($deb - $cred);
+            }
+        } else {
+            $totalRevenue = (float) ChartOfAccount::where('type', 'revenue')->sum('current_balance');
+            $totalExpense = (float) ChartOfAccount::where('type', 'expense')->sum('current_balance');
+        }
+        $currentPeriodNetProfit = $totalRevenue - $totalExpense;
+
         // Add current period net profit to equity
         $totalEquityWithProfit = $totalEquity + $currentPeriodNetProfit;
         $totalLiabilitiesAndEquity = $totalLiabilities + $totalEquityWithProfit;
@@ -185,6 +393,8 @@ class ReportController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
+                'start_date' => $startDate,
+                'end_date' => $endDate,
                 'assets' => $assets,
                 'total_assets' => $totalAssets,
                 'liabilities' => $liabilities,
@@ -204,6 +414,9 @@ class ReportController extends Controller
     public function ledger(Request $request): JsonResponse
     {
         $accountId = $request->get('account_id');
+        $startDate = $request->query('start_date') ?: $request->query('from_date');
+        $endDate = $request->query('end_date') ?: $request->query('to_date');
+
         if (!$accountId) {
             $account = ChartOfAccount::first();
             $accountId = $account ? $account->id : null;
@@ -214,22 +427,69 @@ class ReportController extends Controller
         }
 
         $account = ChartOfAccount::findOrFail($accountId);
+        $isDebitNormal = in_array($account->type, ['asset', 'expense']);
 
-        $lines = JournalEntryLine::with(['journalEntry.branch'])
-            ->where('account_id', $accountId)
-            ->whereHas('journalEntry', function ($q) {
-                $q->where('status', 'posted');
-            })
+        // Calculate opening balance prior to startDate
+        $initialOpening = (float) $account->opening_balance;
+        if ($startDate) {
+            $companyId = request()->header('X-Company-Id') 
+                ?? request()->query('company_id') 
+                ?? session('active_company_id');
+
+            $priorQuery = JournalEntryLine::query()
+                ->join('journal_entries', 'journal_entry_lines.journal_entry_id', '=', 'journal_entries.id')
+                ->where('journal_entry_lines.account_id', $accountId)
+                ->where('journal_entries.status', 'posted')
+                ->where('journal_entries.entry_date', '<', $startDate);
+
+            if ($companyId) {
+                $priorQuery->where('journal_entry_lines.company_id', $companyId);
+            }
+
+            $priorSum = $priorQuery->select(
+                DB::raw('SUM(journal_entry_lines.debit) as debits'),
+                DB::raw('SUM(journal_entry_lines.credit) as credits')
+            )->first();
+
+            $pDeb = (float) ($priorSum->debits ?? 0);
+            $pCred = (float) ($priorSum->credits ?? 0);
+
+            $periodOpeningBalance = $isDebitNormal 
+                ? ($initialOpening + $pDeb - $pCred) 
+                : ($initialOpening + $pCred - $pDeb);
+        } else {
+            $periodOpeningBalance = $initialOpening;
+        }
+
+        $linesQuery = JournalEntryLine::with(['journalEntry.branch'])
+            ->where('journal_entry_lines.account_id', $accountId)
             ->join('journal_entries', 'journal_entry_lines.journal_entry_id', '=', 'journal_entries.id')
-            ->orderBy('journal_entries.entry_date')
+            ->where('journal_entries.status', 'posted');
+
+        $companyId = request()->header('X-Company-Id') 
+            ?? request()->query('company_id') 
+            ?? session('active_company_id');
+        if ($companyId) {
+            $linesQuery->where('journal_entry_lines.company_id', $companyId);
+        }
+
+        if ($startDate) {
+            $linesQuery->where('journal_entries.entry_date', '>=', $startDate);
+        }
+        if ($endDate) {
+            $linesQuery->where('journal_entries.entry_date', '<=', $endDate);
+        }
+
+        $lines = $linesQuery->orderBy('journal_entries.entry_date')
             ->orderBy('journal_entries.id')
             ->select('journal_entry_lines.*')
             ->get();
 
-        $runningBalance = (float) $account->opening_balance;
-        $isDebitNormal = in_array($account->type, ['asset', 'expense']);
-
+        $runningBalance = $periodOpeningBalance;
+        $totalPeriodDebit = 0;
+        $totalPeriodCredit = 0;
         $transactions = [];
+
         foreach ($lines as $line) {
             $debit = (float) $line->debit;
             $credit = (float) $line->credit;
@@ -239,6 +499,9 @@ class ReportController extends Controller
             } else {
                 $runningBalance += ($credit - $debit);
             }
+
+            $totalPeriodDebit += $debit;
+            $totalPeriodCredit += $credit;
 
             $transactions[] = [
                 'id' => $line->id,
@@ -257,8 +520,13 @@ class ReportController extends Controller
             'success' => true,
             'data' => [
                 'account' => $account,
-                'opening_balance' => (float) $account->opening_balance,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'opening_balance' => $periodOpeningBalance,
                 'current_balance' => (float) $account->current_balance,
+                'total_period_debit' => $totalPeriodDebit,
+                'total_period_credit' => $totalPeriodCredit,
+                'closing_balance' => $runningBalance,
                 'transactions' => $transactions,
             ],
         ]);

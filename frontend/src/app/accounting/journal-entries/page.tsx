@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Download, FileText, Plus, Trash2, Upload, X } from "lucide-react";
+import { Download, Edit2, FileText, Plus, Trash2, Upload, X } from "lucide-react";
 import { useCompany } from "@/context/CompanyContext";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -17,9 +17,12 @@ export default function JournalEntriesPage() {
   // Import Modal State
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [overwriteExisting, setOverwriteExisting] = useState(true);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const loadData = () => {
     setLoading(true);
@@ -35,8 +38,53 @@ export default function JournalEntriesPage() {
   };
 
   useEffect(() => {
+    setSelectedIds([]);
     loadData();
   }, [activeCompany.id]);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === entries.length && entries.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(entries.map((e) => e.id));
+    }
+  };
+
+  const toggleSelectEntry = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+
+    const count = selectedIds.length;
+    const isAll = count === entries.length;
+    const confirmMsg = isAll
+      ? `Are you sure you want to delete ALL ${count} journal vouchers? This will reverse all ledger balances in General Ledger!`
+      : `Are you sure you want to delete ${count} selected journal vouchers? This will reverse their General Ledger balances!`;
+
+    if (!confirm(confirmMsg)) {
+      return;
+    }
+
+    setBulkDeleting(true);
+    try {
+      const res = await api.bulkDeleteJournalEntries({ ids: selectedIds });
+      if (res.success) {
+        alert(res.message || `Successfully deleted ${count} journal entries!`);
+        setSelectedIds([]);
+        loadData();
+      } else {
+        alert(res.message || "Failed to delete journal entries");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to delete journal entries");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   const handleDelete = async (id: number, entryNumber: string) => {
     if (!confirm(`Are you sure you want to delete journal voucher "${entryNumber}"? This will reverse all ledger balances associated with it.`)) {
@@ -89,6 +137,7 @@ export default function JournalEntriesPage() {
     const formData = new FormData();
     formData.append("file", selectedFile);
     formData.append("company_id", activeCompany.id.toString());
+    formData.append("overwrite", String(overwriteExisting));
 
     try {
       const res = await api.importJournalEntries(formData);
@@ -139,12 +188,56 @@ export default function JournalEntriesPage() {
         }
       />
 
+      {/* Bulk Selection Actions Banner */}
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-rose-50 border border-rose-200 p-3.5 text-xs text-rose-950 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <span className="font-bold bg-rose-600 text-white rounded-full px-2.5 py-0.5 text-xs shadow-2xs">
+              {selectedIds.length}
+            </span>
+            <span className="font-bold text-rose-900">
+              {selectedIds.length === entries.length
+                ? `All ${selectedIds.length} vouchers selected`
+                : `${selectedIds.length} voucher${selectedIds.length > 1 ? "s" : ""} selected`}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="text-rose-700 underline hover:text-rose-950 text-xs ml-2 cursor-pointer font-medium"
+            >
+              Clear selection
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="h-8.5 bg-rose-600 hover:bg-rose-700 font-bold text-white text-xs px-4 shadow-xs inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <Trash2 size={14} />
+              {bulkDeleting ? "Deleting..." : `Delete Selected (${selectedIds.length})`}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Entries Table */}
       <div className="overflow-hidden rounded-lg border border-[#E2E8F0] bg-white shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead className="border-b border-[#E2E8F0] bg-[#F8FAFC] font-bold text-[11px] uppercase tracking-wider text-[#64748B]">
               <tr>
+                <th className="w-10 px-4 py-3.5 text-center">
+                  <input
+                    type="checkbox"
+                    checked={entries.length > 0 && selectedIds.length === entries.length}
+                    onChange={toggleSelectAll}
+                    className="rounded border-[#CBD5E1] text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
+                    title="Select All Vouchers"
+                  />
+                </th>
                 <th className="px-5 py-3.5">Voucher #</th>
                 <th className="px-5 py-3.5">Date</th>
                 <th className="px-5 py-3.5">Type</th>
@@ -158,67 +251,90 @@ export default function JournalEntriesPage() {
             <tbody className="divide-y divide-[#E2E8F0] font-medium text-[#0F172A]">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-[#64748B]">
+                  <td colSpan={9} className="py-12 text-center text-[#64748B]">
                     Loading journal entries...
                   </td>
                 </tr>
               ) : entries.length > 0 ? (
-                entries.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-[#F8FAFC] transition">
-                    <td className="whitespace-nowrap px-5 py-3.5 font-mono font-bold text-[#2563EB]">
-                      <Link
-                        href={`/accounting/journal-entries/create?id=${entry.id}`}
-                        className="hover:underline cursor-pointer"
-                      >
-                        {entry.entry_number}
-                      </Link>
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-[#64748B] font-mono text-xs">
-                      {formatDateDDMMYYYY(entry.entry_date)}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3.5">
-                      <span className="rounded-md bg-[#F8FAFC] border border-[#E2E8F0] px-2 py-0.5 text-[10px] font-bold text-[#0F172A]">
-                        {entry.voucher_type}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <p className="font-semibold text-[#0F172A]">{entry.narration || "General transaction"}</p>
-                      {entry.reference && (
-                        <p className="text-[11px] text-[#64748B]">Ref: {entry.reference}</p>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right font-mono font-bold text-[#0F172A]">
-                      {formatCurrency(parseFloat(entry.total_debit))}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right font-mono font-bold text-[#0F172A]">
-                      {formatCurrency(parseFloat(entry.total_credit))}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-center">
-                      <span
-                        className={`rounded-md px-2.5 py-0.5 text-[10px] font-bold uppercase ${
-                          entry.status === "posted"
-                            ? "bg-emerald-50 text-[#16A34A] border border-[#10B981]/20"
-                            : "bg-slate-100 text-[#64748B] border border-slate-200"
-                        }`}
-                      >
-                        {entry.status}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-center">
-                      <button
-                        onClick={() => handleDelete(entry.id, entry.entry_number)}
-                        disabled={deletingId === entry.id}
-                        className="inline-flex items-center gap-1 rounded-md p-1.5 text-[#94A3B8] hover:text-[#EF4444] hover:bg-[#FEF2F2] transition cursor-pointer disabled:opacity-50"
-                        title="Delete journal entry"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                entries.map((entry) => {
+                  const isSelected = selectedIds.includes(entry.id);
+                  return (
+                    <tr
+                      key={entry.id}
+                      className={`hover:bg-[#F8FAFC] transition ${isSelected ? "bg-rose-50/40" : ""}`}
+                    >
+                      <td className="w-10 px-4 py-3.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectEntry(entry.id)}
+                          className="rounded border-[#CBD5E1] text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
+                        />
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5 font-mono font-bold text-[#2563EB]">
+                        <Link
+                          href={`/accounting/journal-entries/create?id=${entry.id}`}
+                          className="hover:underline cursor-pointer"
+                        >
+                          {entry.entry_number}
+                        </Link>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5 text-[#64748B] font-mono text-xs">
+                        {formatDateDDMMYYYY(entry.entry_date)}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5">
+                        <span className="rounded-md bg-[#F8FAFC] border border-[#E2E8F0] px-2 py-0.5 text-[10px] font-bold text-[#0F172A]">
+                          {entry.voucher_type}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <p className="font-semibold text-[#0F172A]">{entry.narration || "General transaction"}</p>
+                        {entry.reference && (
+                          <p className="text-[11px] text-[#64748B]">Ref: {entry.reference}</p>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5 text-right font-mono font-bold text-[#0F172A]">
+                        {formatCurrency(parseFloat(entry.total_debit))}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5 text-right font-mono font-bold text-[#0F172A]">
+                        {formatCurrency(parseFloat(entry.total_credit))}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5 text-center">
+                        <span
+                          className={`rounded-md px-2.5 py-0.5 text-[10px] font-bold uppercase ${
+                            entry.status === "posted"
+                              ? "bg-emerald-50 text-[#16A34A] border border-[#10B981]/20"
+                              : "bg-slate-100 text-[#64748B] border border-slate-200"
+                          }`}
+                        >
+                          {entry.status}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3.5 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Link
+                            href={`/accounting/journal-entries/create?id=${entry.id}`}
+                            className="inline-flex items-center gap-1 rounded-md p-1.5 text-[#64748B] hover:text-[#2563EB] hover:bg-[#F1F5F9] transition cursor-pointer"
+                            title="Edit journal voucher"
+                          >
+                            <Edit2 size={15} />
+                          </Link>
+                          <button
+                            onClick={() => handleDelete(entry.id, entry.entry_number)}
+                            disabled={deletingId === entry.id}
+                            className="inline-flex items-center gap-1 rounded-md p-1.5 text-[#94A3B8] hover:text-[#EF4444] hover:bg-[#FEF2F2] transition cursor-pointer disabled:opacity-50"
+                            title="Delete journal voucher"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-[#64748B]">
+                  <td colSpan={9} className="py-10 text-center text-[#64748B]">
                     No journal entries recorded for {activeCompany.name} yet.
                   </td>
                 </tr>
@@ -271,6 +387,9 @@ export default function JournalEntriesPage() {
                 <p className="text-[11px] text-[#64748B] leading-relaxed">
                   Required columns: <code className="font-mono text-[#0F172A] bg-white px-1 py-0.5 rounded border border-[#E2E8F0]">Date</code>, <code className="font-mono text-[#0F172A] bg-white px-1 py-0.5 rounded border border-[#E2E8F0]">Reference</code>, <code className="font-mono text-[#0F172A] bg-white px-1 py-0.5 rounded border border-[#E2E8F0]">Narration</code>, <code className="font-mono text-[#0F172A] bg-white px-1 py-0.5 rounded border border-[#E2E8F0]">Account Code</code>, <code className="font-mono text-[#0F172A] bg-white px-1 py-0.5 rounded border border-[#E2E8F0]">Debit</code>, <code className="font-mono text-[#0F172A] bg-white px-1 py-0.5 rounded border border-[#E2E8F0]">Credit</code>. Rows with matching reference belong to the same balanced voucher.
                 </p>
+                <p className="text-[10px] text-[#2563EB] font-medium">
+                  ✓ Flexible dates supported: DD-MM-YYYY, DD/MM/YYYY, DD-MM-YY (e.g. 09-08-26), and YYYY-MM-DD.
+                </p>
               </div>
 
               <div>
@@ -301,6 +420,22 @@ export default function JournalEntriesPage() {
                     />
                   </label>
                 </div>
+              </div>
+
+              <div className="flex items-start gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="overwriteExisting"
+                  checked={overwriteExisting}
+                  onChange={(e) => setOverwriteExisting(e.target.checked)}
+                  className="h-4 w-4 rounded border-[#CBD5E1] text-[#2563EB] focus:ring-[#2563EB] mt-0.5 cursor-pointer"
+                />
+                <label htmlFor="overwriteExisting" className="text-xs text-[#0F172A] cursor-pointer select-none">
+                  <span className="font-semibold">Replace existing entries with matching Reference</span>
+                  <span className="block text-[11px] text-[#64748B]">
+                    Replaces previously imported vouchers with the same reference (e.g. JV-1001) with clean dates & balances.
+                  </span>
+                </label>
               </div>
 
               {importError && (
