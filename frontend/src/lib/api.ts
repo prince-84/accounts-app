@@ -109,7 +109,36 @@ export const api = {
   }),
 
   // Journal Entries
-  getJournalEntries: (params: string = "") => request<{ success: boolean; data: any }>(`/journal-entries?${params}`),
+  getJournalEntries: (
+    params:
+      | string
+      | {
+          search?: string;
+          start_date?: string;
+          end_date?: string;
+          voucher_type?: string;
+          status?: string;
+          page?: number;
+          per_page?: number | string;
+        } = ""
+  ) => {
+    let qs = "";
+    if (typeof params === "string") {
+      qs = params ? `?${params}` : "";
+    } else if (params && typeof params === "object") {
+      const q = new URLSearchParams();
+      if (params.search) q.append("search", params.search);
+      if (params.start_date) q.append("start_date", params.start_date);
+      if (params.end_date) q.append("end_date", params.end_date);
+      if (params.voucher_type) q.append("voucher_type", params.voucher_type);
+      if (params.status) q.append("status", params.status);
+      if (params.page) q.append("page", params.page.toString());
+      if (params.per_page) q.append("per_page", params.per_page.toString());
+      const queryStr = q.toString();
+      qs = queryStr ? `?${queryStr}` : "";
+    }
+    return request<{ success: boolean; data: any }>(`/journal-entries${qs}`);
+  },
   getJournalEntry: (id: string | number) => request<{ success: boolean; data: any }>(`/journal-entries/${id}`),
   createJournalEntry: (data: any) => request<{ success: boolean; data: any }>("/journal-entries", {
     method: "POST",

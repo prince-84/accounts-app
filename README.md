@@ -82,6 +82,9 @@ The application currently manages 3 legal corporate entities:
 - Manual Journal Voucher engine supporting JV, PV (Payment), RV (Receipt), and CV (Contra).
 - Real-time frontend and backend validation: **Total Debit MUST equal Total Credit**.
 - Automatic GL posting updating account current balances atomically.
+- **Universal Multi-Column Search**: Global search input matching across all table columns and nested line items (Voucher #, Reference, Narration, Voucher Type, Status, Currency, Debit, Credit, line descriptions, and associated Chart of Account names and codes).
+- **Date Range Calendar Filter**: Interactive date filter toolbar with quick presets (`All Dates`, `This Month`, `Last Month`, `This Quarter`, `This Year`, `Custom Range`) and explicit `From Date` and `To Date` calendar pickers with real-time filter reset.
+- **Server Pagination (20 Records Default)**: Paginated vouchers table displaying 20 entries by default, with selectable page sizes (20, 50, 100), range indicators (`Showing X to Y of Z entries`), and first/prev/numbered/next/last navigation controls.
 - **Edit & Update Journal Vouchers**: Full editing capability (`PUT /api/journal-entries/{id}`) with auto-mapped voucher lines, amounts, clean dates, and atomic reversal and re-posting of GL account balances. Accessible via Voucher Number click or dedicated Edit icon.
 - **Import Journal Entries**: Bulk CSV import with robust date parser supporting `DD-MM-YYYY`, `DD/MM/YYYY`, `DD-MM-YY` (e.g. `09-08-26`), `YYYY-MM-DD`, and Excel numeric serial formats.
 - **Overwrite / Replace Existing Vouchers**: Cleanly update and re-sync previously imported vouchers with matching reference numbers without manual line-by-line deletions.

@@ -26,15 +26,52 @@ class JournalEntryController extends Controller
             ->orderBy('entry_date', 'desc')
             ->orderBy('id', 'desc');
 
-        if ($request->has('voucher_type')) {
+        if ($request->filled('voucher_type')) {
             $query->where('voucher_type', $request->voucher_type);
         }
 
-        if ($request->has('status')) {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        $entries = $query->paginate($request->get('per_page', 50));
+        // Date range filter (start_date/from_date and end_date/to_date)
+        $startDate = $request->query('start_date') ?: $request->query('from_date');
+        $endDate = $request->query('end_date') ?: $request->query('to_date');
+
+        if ($startDate) {
+            $query->where('entry_date', '>=', $startDate);
+        }
+        if ($endDate) {
+            $query->where('entry_date', '<=', $endDate);
+        }
+
+        // Global search across all columns and line items
+        if ($request->filled('search')) {
+            $search = trim($request->query('search'));
+            $query->where(function ($q) use ($search) {
+                $q->where('entry_number', 'like', "%{$search}%")
+                    ->orWhere('reference', 'like', "%{$search}%")
+                    ->orWhere('narration', 'like', "%{$search}%")
+                    ->orWhere('voucher_type', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhere('currency_code', 'like', "%{$search}%")
+                    ->orWhere('entry_date', 'like', "%{$search}%")
+                    ->orWhere('total_debit', 'like', "%{$search}%")
+                    ->orWhere('total_credit', 'like', "%{$search}%")
+                    ->orWhereHas('lines', function ($lq) use ($search) {
+                        $lq->where('description', 'like', "%{$search}%")
+                            ->orWhere('debit', 'like', "%{$search}%")
+                            ->orWhere('credit', 'like', "%{$search}%")
+                            ->orWhereHas('account', function ($aq) use ($search) {
+                                $aq->where('name', 'like', "%{$search}%")
+                                    ->orWhere('code', 'like', "%{$search}%");
+                            });
+                    });
+            });
+        }
+
+        $perPage = $request->get('per_page', 20);
+        $entries = ($perPage === 'all' || $perPage == -1) ? $query->get() : $query->paginate($perPage);
 
         return response()->json([
             'success' => true,
