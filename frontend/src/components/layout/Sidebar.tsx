@@ -96,6 +96,21 @@ const navigationGroups = [
       },
     ],
   },
+  {
+    label: "OWNER PERSONAL",
+    items: [
+      {
+        name: "Bank Statements",
+        href: "/accounting/personal/bank-statements",
+        icon: Landmark,
+      },
+      {
+        name: "Personal COA",
+        href: "/accounting/personal/chart-of-accounts",
+        icon: BookOpen,
+      },
+    ],
+  },
 ];
 
 export default function Sidebar({

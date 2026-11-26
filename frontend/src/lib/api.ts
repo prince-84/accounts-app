@@ -218,4 +218,72 @@ export const api = {
       body: isFormData ? body : JSON.stringify(body),
     });
   },
+
+  // Owner Personal Accounts & Bank Statements
+  getPersonalAccounts: () => request<{ success: boolean; data: any[] }>("/personal/accounts"),
+  createPersonalAccount: (data: any) =>
+    request<{ success: boolean; data: any; message?: string }>("/personal/accounts", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updatePersonalAccount: (id: string | number, data: any) =>
+    request<{ success: boolean; data: any; message?: string }>(`/personal/accounts/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  togglePersonalAccountActive: (id: string | number) =>
+    request<{ success: boolean; data: any }>(`/personal/accounts/${id}/toggle-active`, {
+      method: "POST",
+    }),
+  deletePersonalAccount: (id: string | number) =>
+    request<{ success: boolean; message?: string }>(`/personal/accounts/${id}`, {
+      method: "DELETE",
+    }),
+
+  getPersonalBankStatements: (params?: {
+    search?: string;
+    start_date?: string;
+    end_date?: string;
+    category?: string;
+    personal_account_id?: string | number;
+    page?: number;
+    per_page?: number | string;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.search) q.append("search", params.search);
+    if (params?.start_date) q.append("start_date", params.start_date);
+    if (params?.end_date) q.append("end_date", params.end_date);
+    if (params?.category) q.append("category", params.category);
+    if (params?.personal_account_id) q.append("personal_account_id", params.personal_account_id.toString());
+    if (params?.page) q.append("page", params.page.toString());
+    if (params?.per_page) q.append("per_page", params.per_page.toString());
+    const qs = q.toString();
+    return request<{ success: boolean; data: any; summary?: { total_debit: number; total_credit: number; net_flow: number } }>(
+      `/personal/bank-statements${qs ? `?${qs}` : ""}`
+    );
+  },
+  createPersonalBankStatement: (data: any) =>
+    request<{ success: boolean; data: any; message?: string }>("/personal/bank-statements", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updatePersonalBankStatement: (id: string | number, data: any) =>
+    request<{ success: boolean; data: any; message?: string }>(`/personal/bank-statements/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  deletePersonalBankStatement: (id: string | number) =>
+    request<{ success: boolean; message?: string }>(`/personal/bank-statements/${id}`, {
+      method: "DELETE",
+    }),
+  bulkDeletePersonalBankStatements: (ids: number[]) =>
+    request<{ success: boolean; message?: string; count?: number }>("/personal/bank-statements/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
+  importPersonalBankStatements: (formData: FormData) =>
+    request<{ success: boolean; message: string; count?: number }>("/personal/bank-statements/import", {
+      method: "POST",
+      body: formData,
+    }),
 };

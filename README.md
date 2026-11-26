@@ -53,6 +53,8 @@ The application currently manages 3 legal corporate entities:
 - `receipts` & `payments`: Customer receipts and vendor disbursements with GL linkage.
 - `bank_accounts`: Linked asset accounts, IBANs, and balances.
 - `petty_cash_funds` & `petty_cash_vouchers`: Imprest fund custodian records and expense vouchers.
+- `personal_accounts`: Owner's isolated personal Chart of Accounts (Personal Banks, Credit Cards, Party/Client Ledgers, Personal Income & Expenses).
+- `personal_bank_statements`: Owner's personal bank statement transactions imported from Excel (`bank-statement-format.xlsx`) or entered manually.
 
 ---
 
@@ -136,6 +138,15 @@ The application currently manages 3 legal corporate entities:
 
 ### 5.8 Company Settings (`/accounting/settings`)
 - Corporate profile, tax identifier, fiscal year settings, and quick workspace switcher.
+
+### 5.9 Owner Personal Accounts (`/accounting/personal/*`)
+- **Personal Bank Statements (`/accounting/personal/bank-statements`)**:
+  - **Official Excel Template Download**: One-click download of `bank-statement-format.xlsx` (`Date`, `Description`, `Debit (money out)`, `Credit (money in)`, `Balance`, `Category (pick)`, `Notes`, `Month`).
+  - **Native Excel (.xlsx) & CSV Importer**: Automatically parses `bank-statement-format.xlsx` (including ADCB bank header detection, `Opening` balance rows, flexible dates, and auto-creation/linking of categories).
+  - **Manual ADD / EDIT Entry Form**: Full modal form to add or edit any bank statement transaction with Bank Account, Date, Description, Debit, Credit, Balance, Category, Notes, and Month.
+  - **Search, Category & Date Range Filters + Pagination**: Universal search across all columns, category dropdown filter, calendar date range presets (`This Month`, `Last Month`, `This Quarter`, `This Year`, `Custom`), multi-select bulk delete, and server-side pagination (20 records per page default).
+- **Personal Chart of Accounts (`/accounting/personal/chart-of-accounts`)**:
+  - Isolated personal categories, bank accounts, credit cards, income, expenses, and party/friend ledgers with Add, Edit, Active/Inactive toggle, and Delete support.
 
 ---
 
